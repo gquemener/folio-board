@@ -71,11 +71,17 @@ press the pad's button at any time.
 | Clear the page     | Clear     | `c`        |
 | Undo last stroke   | Undo      | `Ctrl+Z`   |
 | Rotate the page    | Rotate    | `r`        |
+| Save as PNG or SVG | Save      | `Ctrl+S`   |
 | Force a reconnect  | Reconnect |            |
 | Quit               |           | `q`, `Esc` |
 
 The red dot shows where the pen hovers, so viewers can follow it before it
 touches the paper.
+
+Save opens a file dialog in your Pictures folder. The format follows the file
+extension: `.svg` gives a vector file at the paper's real size, anything else a
+200 DPI PNG. The saved page uses the board's current rotation and leaves out the
+hover dot.
 
 ## Good to know
 

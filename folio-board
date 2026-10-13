@@ -7,7 +7,7 @@ created (the cursor stays put) and no root access is needed: we decode the
 UHID_INPUT2 packets ourselves and draw them.
 
 Usage: folio-board [BLUETOOTH_ADDRESS]
-Keys: c clear, Ctrl+Z undo, r rotate, q / Esc quit.
+Keys: c clear, Ctrl+Z undo, r rotate, Ctrl+S save, q / Esc quit.
 """
 import os
 import signal
@@ -35,6 +35,9 @@ POINT_SIZE_UM = 10
 # A4 Bamboo Folio / Slate size, used until tuhi reads the real one from the pad.
 FALLBACK_DIMENSIONS_UM = (297000, 216000)
 ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape']
+
+PNG_DPI = 200
+MM_PER_INCH = 25.4
 
 MANAGER_PATH = '/org/freedesktop/tuhi1'
 TUHI_SERVER = os.environ.get('TUHI_SERVER', '/usr/libexec/tuhi/tuhi-server')
@@ -128,6 +131,55 @@ class Board:
         self.current.append((x, y, pressure))
 
 
+def render_page(cr, board, scale):
+    """Draw the white page and its strokes; cr is already scaled to pad units."""
+    vw, vh = board.view_size
+    cr.rectangle(0, 0, vw, vh)
+    cr.set_source_rgb(1, 1, 1)
+    cr.fill()
+
+    cr.set_line_cap(cairo.LINE_CAP_ROUND)
+    cr.set_line_join(cairo.LINE_JOIN_ROUND)
+    cr.set_source_rgb(0.08, 0.08, 0.1)
+    base = 2.0 / scale  # minimum ~2 output px so light strokes stay visible
+    for stroke in board.strokes:
+        prev = None
+        for x, y, p in stroke:
+            vx, vy = board.to_view(x, y)
+            cr.set_line_width(base + 30 * p / PRESSURE_MAX)
+            if prev is None:
+                cr.move_to(vx, vy)
+                cr.line_to(vx, vy)
+            else:
+                cr.move_to(*prev)
+                cr.line_to(vx, vy)
+            cr.stroke()
+            prev = (vx, vy)
+
+
+def export(board, path):
+    """Save the page as SVG (sized in points, true to paper) or, otherwise, PNG."""
+    vw, vh = board.view_size
+    mm_per_unit = POINT_SIZE_UM / 1000
+    if path.lower().endswith('.svg'):
+        scale = mm_per_unit * 72 / MM_PER_INCH
+        surface = cairo.SVGSurface(path, vw * scale, vh * scale)
+    else:
+        scale = mm_per_unit * PNG_DPI / MM_PER_INCH
+        surface = cairo.ImageSurface(cairo.FORMAT_RGB24, round(vw * scale), round(vh * scale))
+    cr = cairo.Context(surface)
+    cr.scale(scale, scale)
+    render_page(cr, board, scale)
+    if isinstance(surface, cairo.ImageSurface):
+        surface.write_to_png(path)
+    surface.finish()
+
+
+def pictures_dir():
+    path = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES)
+    return path or os.path.expanduser('~/Pictures')
+
+
 class BoardWindow(Gtk.ApplicationWindow):
     def __init__(self, app, board, bus, reconnect):
         super().__init__(application=app, title='Folio board')
@@ -147,6 +199,9 @@ class BoardWindow(Gtk.ApplicationWindow):
         # so Reconnect is only offered once a connection has been made.
         self.reconnect_button = button
         button.set_sensitive(False)
+        save = Gtk.Button(label='Save')
+        save.connect('clicked', lambda _b: self.save())
+        header.pack_end(save)
         self.status = Gtk.Label(label='Starting…')
         header.pack_end(self.status)
         self.set_titlebar(header)
@@ -164,7 +219,34 @@ class BoardWindow(Gtk.ApplicationWindow):
             self.rotate()
         elif keyval == Gdk.KEY_z and state & Gdk.ModifierType.CONTROL_MASK:
             self.undo()
+        elif keyval == Gdk.KEY_s and state & Gdk.ModifierType.CONTROL_MASK:
+            self.save()
         return True
+
+    def save(self):
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        for name, pattern in (('PNG image', '*.png'), ('SVG image', '*.svg')):
+            file_filter = Gtk.FileFilter(name=name)
+            file_filter.add_pattern(pattern)
+            filters.append(file_filter)
+        dialog = Gtk.FileDialog(title='Save drawing', filters=filters,
+                                initial_name=time.strftime('folio-board-%Y-%m-%d-%H%M%S.png'))
+        folder = pictures_dir()
+        if os.path.isdir(folder):
+            dialog.set_initial_folder(Gio.File.new_for_path(folder))
+        dialog.save(self, None, self.on_save_chosen)
+
+    def on_save_chosen(self, dialog, result):
+        try:
+            path = dialog.save_finish(result).get_path()
+        except GLib.Error:
+            return  # dismissed
+        try:
+            export(self.board, path)
+        except (OSError, cairo.Error) as e:
+            self.status.set_label(f'Save failed: {e}')
+            return
+        self.status.set_label(f'Saved {os.path.basename(path)}')
 
     def clear(self):
         self.board.strokes.clear()
@@ -190,28 +272,7 @@ class BoardWindow(Gtk.ApplicationWindow):
         scale = min(width / vw, height / vh)
         cr.translate((width - vw * scale) / 2, (height - vh * scale) / 2)
         cr.scale(scale, scale)
-
-        cr.rectangle(0, 0, vw, vh)
-        cr.set_source_rgb(1, 1, 1)
-        cr.fill()
-
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.set_line_join(cairo.LINE_JOIN_ROUND)
-        cr.set_source_rgb(0.08, 0.08, 0.1)
-        base = 2.0 / scale  # minimum ~2 screen px so light strokes stay visible
-        for stroke in self.board.strokes:
-            prev = None
-            for x, y, p in stroke:
-                vx, vy = self.board.to_view(x, y)
-                cr.set_line_width(base + 30 * p / PRESSURE_MAX)
-                if prev is None:
-                    cr.move_to(vx, vy)
-                    cr.line_to(vx, vy)
-                else:
-                    cr.move_to(*prev)
-                    cr.line_to(vx, vy)
-                cr.stroke()
-                prev = (vx, vy)
+        render_page(cr, self.board, scale)
 
         if self.board.hover:
             vx, vy = self.board.to_view(*self.board.hover)
