@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+"""Mirror what you draw on a Wacom SmartPad into a window, live.
+
+Tuhi's live mode expects a /dev/uhid fd and writes kernel UHID packets to
+it. We hand it one end of a socketpair instead, so no system tablet is
+created (the cursor stays put) and no root access is needed: we decode the
+UHID_INPUT2 packets ourselves and draw them.
+
+Usage: folio-board [BLUETOOTH_ADDRESS]
+Keys: c clear, Ctrl+Z undo, r rotate, q / Esc quit.
+"""
+import os
+import signal
+import socket
+import struct
+import subprocess
+import sys
+import time
+
+import gi
+
+gi.require_version('Gtk', '4.0')
+gi.require_version('GLibUnix', '2.0')
+from gi.repository import Gdk, Gio, GLib, GLibUnix, Gtk  # noqa: E402
+
+import cairo  # noqa: E402
+
+BUS = 'org.freedesktop.tuhi1'
+DEVICE_IFACE = 'org.freedesktop.tuhi1.Device'
+UHID_CREATE2 = 11
+UHID_INPUT2 = 12
+RETRY_SECONDS = 30
+PRESSURE_MAX = 2047
+POINT_SIZE_UM = 10
+# A4 Bamboo Folio / Slate size, used until tuhi reads the real one from the pad.
+FALLBACK_DIMENSIONS_UM = (297000, 216000)
+ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape']
+
+MANAGER_PATH = '/org/freedesktop/tuhi1'
+TUHI_SERVER = os.environ.get('TUHI_SERVER', '/usr/libexec/tuhi/tuhi-server')
+
+
+def tuhi_running(bus):
+    owner = bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                          'NameHasOwner', GLib.Variant('(s)', (BUS,)), GLib.VariantType('(b)'),
+                          Gio.DBusCallFlags.NONE, -1, None)
+    return owner.unpack()[0]
+
+
+def ensure_tuhi(bus):
+    """Start tuhi-server if nobody provides it; return the process we started, if any."""
+    if tuhi_running(bus):
+        return None
+    try:
+        server = subprocess.Popen([TUHI_SERVER])
+    except FileNotFoundError:
+        sys.exit(f'tuhi is not running and {TUHI_SERVER} was not found. '
+                 'Start Tuhi yourself or set TUHI_SERVER to its path.')
+    for _ in range(50):
+        if tuhi_running(bus):
+            return server
+        time.sleep(0.2)
+    server.terminate()
+    sys.exit('tuhi-server did not show up on the session bus')
+
+
+def find_device(bus, address):
+    if address:
+        return MANAGER_PATH + '/' + address.replace(':', '_')
+    devices = bus.call_sync(BUS, MANAGER_PATH, 'org.freedesktop.DBus.Properties', 'Get',
+                            GLib.Variant('(ss)', ('org.freedesktop.tuhi1.Manager', 'Devices')),
+                            GLib.VariantType('(v)'), Gio.DBusCallFlags.NONE, -1, None).unpack()[0]
+    if not devices:
+        sys.exit('No registered device: pair your pad once with the Tuhi app first.')
+    return devices[0]
+
+
+def drop_stale_connection(bus, device_path):
+    """A pad still connected from a previous tuhi run never switches to live mode."""
+    bluez_path = bus.call_sync(BUS, device_path, 'org.freedesktop.DBus.Properties', 'Get',
+                               GLib.Variant('(ss)', (DEVICE_IFACE, 'BlueZDevice')),
+                               GLib.VariantType('(v)'), Gio.DBusCallFlags.NONE, -1, None).unpack()[0]
+    system_bus = Gio.bus_get_sync(Gio.BusType.SYSTEM)
+    try:
+        system_bus.call_sync('org.bluez', bluez_path, 'org.bluez.Device1', 'Disconnect',
+                             None, None, Gio.DBusCallFlags.NONE, 5000, None)
+    except GLib.Error:
+        pass
+
+
+class Board:
+    def __init__(self, pad_w, pad_h):
+        self.pad_w, self.pad_h = pad_w, pad_h
+        self.orientation = 'portrait'
+        self.strokes = []
+        self.current = None
+        self.hover = None
+
+    @property
+    def view_size(self):
+        if self.orientation in ('portrait', 'reverse-portrait'):
+            return self.pad_h, self.pad_w
+        return self.pad_w, self.pad_h
+
+    def to_view(self, x, y):
+        # Same mapping as tuhi's exporter, so the board matches tuhi's SVGs.
+        w, h = self.view_size
+        if self.orientation == 'portrait':
+            return w - y, x
+        if self.orientation == 'reverse-portrait':
+            return y, h - x
+        if self.orientation == 'reverse-landscape':
+            return w - x, h - y
+        return x, y
+
+    def pen(self, in_range, x, y, pressure):
+        if not in_range:
+            self.hover = None
+            self.current = None
+            return
+        self.hover = (x, y)
+        if pressure == 0:
+            self.current = None
+            return
+        if self.current is None:
+            self.current = []
+            self.strokes.append(self.current)
+        self.current.append((x, y, pressure))
+
+
+class BoardWindow(Gtk.ApplicationWindow):
+    def __init__(self, app, board, bus, reconnect):
+        super().__init__(application=app, title='Folio board')
+        self.board, self.bus = board, bus
+        self.set_default_size(700, 950)
+
+        self.area = Gtk.DrawingArea()
+        self.area.set_draw_func(self.on_draw)
+        self.set_child(self.area)
+
+        header = Gtk.HeaderBar()
+        for label, handler in (('Clear', self.clear), ('Undo', self.undo), ('Rotate', self.rotate), ('Reconnect', reconnect)):
+            button = Gtk.Button(label=label)
+            button.connect('clicked', lambda _b, h=handler: h())
+            header.pack_start(button)
+        # Restarting while a connection attempt is pending makes BlueZ fail it,
+        # so Reconnect is only offered once a connection has been made.
+        self.reconnect_button = button
+        button.set_sensitive(False)
+        self.status = Gtk.Label(label='Starting…')
+        header.pack_end(self.status)
+        self.set_titlebar(header)
+
+        keys = Gtk.EventControllerKey()
+        keys.connect('key-pressed', self.on_key)
+        self.add_controller(keys)
+
+    def on_key(self, _ctrl, keyval, _code, state):
+        if keyval in (Gdk.KEY_q, Gdk.KEY_Escape):
+            self.close()
+        elif keyval == Gdk.KEY_c:
+            self.clear()
+        elif keyval == Gdk.KEY_r:
+            self.rotate()
+        elif keyval == Gdk.KEY_z and state & Gdk.ModifierType.CONTROL_MASK:
+            self.undo()
+        return True
+
+    def clear(self):
+        self.board.strokes.clear()
+        self.board.current = None
+        self.area.queue_draw()
+
+    def undo(self):
+        if self.board.strokes:
+            self.board.strokes.pop()
+            self.board.current = None
+            self.area.queue_draw()
+
+    def rotate(self):
+        i = ORIENTATIONS.index(self.board.orientation)
+        self.board.orientation = ORIENTATIONS[(i + 1) % len(ORIENTATIONS)]
+        self.area.queue_draw()
+
+    def on_draw(self, _area, cr, width, height):
+        cr.set_source_rgb(0.18, 0.18, 0.2)
+        cr.paint()
+
+        vw, vh = self.board.view_size
+        scale = min(width / vw, height / vh)
+        cr.translate((width - vw * scale) / 2, (height - vh * scale) / 2)
+        cr.scale(scale, scale)
+
+        cr.rectangle(0, 0, vw, vh)
+        cr.set_source_rgb(1, 1, 1)
+        cr.fill()
+
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_line_join(cairo.LINE_JOIN_ROUND)
+        cr.set_source_rgb(0.08, 0.08, 0.1)
+        base = 2.0 / scale  # minimum ~2 screen px so light strokes stay visible
+        for stroke in self.board.strokes:
+            prev = None
+            for x, y, p in stroke:
+                vx, vy = self.board.to_view(x, y)
+                cr.set_line_width(base + 30 * p / PRESSURE_MAX)
+                if prev is None:
+                    cr.move_to(vx, vy)
+                    cr.line_to(vx, vy)
+                else:
+                    cr.move_to(*prev)
+                    cr.line_to(vx, vy)
+                cr.stroke()
+                prev = (vx, vy)
+
+        if self.board.hover:
+            vx, vy = self.board.to_view(*self.board.hover)
+            cr.set_source_rgba(0.9, 0.2, 0.2, 0.7)
+            cr.arc(vx, vy, 6 / scale, 0, 6.2832)
+            cr.fill()
+
+
+def main():
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+    server = ensure_tuhi(bus)
+    device_path = find_device(bus, sys.argv[1] if len(sys.argv) > 1 else None)
+    drop_stale_connection(bus, device_path)
+    dims = bus.call_sync(BUS, device_path, 'org.freedesktop.DBus.Properties', 'Get',
+                         GLib.Variant('(ss)', (DEVICE_IFACE, 'Dimensions')),
+                         GLib.VariantType('(v)'), Gio.DBusCallFlags.NONE, -1, None)
+    w_um, h_um = dims.unpack()[0]
+    if not w_um or not h_um:
+        w_um, h_um = FALLBACK_DIMENSIONS_UM
+    board = Board(w_um // POINT_SIZE_UM, h_um // POINT_SIZE_UM)
+
+    app = Gtk.Application(application_id='io.github.FolioBoard')
+    state = {'connected': False, 'sock': None, 'watch': None, 'started_at': 0}
+
+    def set_connected(connected):
+        state['connected'] = connected
+        if state.get('win'):
+            state['win'].reconnect_button.set_sensitive(connected)
+
+    def set_status(text):
+        win = state.get('win')
+        if win:
+            win.status.set_label(text)
+
+    def on_packet(_fd, _cond):
+        packet = state['sock'].recv(8192)
+        if not packet:
+            return GLib.SOURCE_REMOVE
+        kind = struct.unpack_from('<L', packet)[0]
+        if kind == UHID_CREATE2:
+            set_connected(True)
+            set_status('Connected, draw away')
+        elif kind == UHID_INPUT2:
+            _report_id, in_range, x, y, pressure = struct.unpack_from('<BBHHH', packet, 6)
+            board.pen(in_range, x, y, pressure)
+            if state.get('win'):
+                state['win'].area.queue_draw()
+        return GLib.SOURCE_CONTINUE
+
+    def on_signal(_conn, _sender, _obj, _iface, name, params):
+        if name == 'PropertiesChanged':
+            w_um, h_um = params[1].get('Dimensions', (0, 0))
+            if w_um and h_um:
+                board.pad_w, board.pad_h = w_um // POINT_SIZE_UM, h_um // POINT_SIZE_UM
+        elif name == 'LiveStopped' and params[0] != 0:
+            set_connected(False)
+            set_status(f'Live mode stopped ({params[0]}), retrying…')
+
+    def stop_live():
+        # StopLive is declared NoReply, so a sync call would block until timeout.
+        bus.call(BUS, device_path, DEVICE_IFACE, 'StopLive', None, None,
+                 Gio.DBusCallFlags.NONE, -1, None, None, None)
+        if state['watch']:
+            GLib.source_remove(state['watch'])
+            state['watch'] = None
+        if state['sock']:
+            state['sock'].close()
+            state['sock'] = None
+
+    def start_live():
+        stop_live()
+        set_connected(False)
+        state['started_at'] = time.monotonic()
+        ours, theirs = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        state['sock'] = ours
+        state['watch'] = GLibUnix.fd_add_full(GLib.PRIORITY_DEFAULT, ours.fileno(),
+                                              GLib.IOCondition.IN, on_packet)
+        fds = Gio.UnixFDList.new()
+        fds.append(theirs.fileno())
+        result, _ = bus.call_with_unix_fd_list_sync(
+            BUS, device_path, DEVICE_IFACE, 'StartLive',
+            GLib.Variant('(h)', (0,)), GLib.VariantType('(i)'),
+            Gio.DBusCallFlags.NONE, -1, fds, None)
+        theirs.close()
+        if result[0] != 0:
+            set_status(f'StartLive failed ({result[0]})')
+        else:
+            set_status('Waiting for the Folio… press its button')
+
+    def retry_if_not_connected():
+        # tuhi tries to connect once per StartLive and gives up after ~25s.
+        if not state['connected'] and time.monotonic() - state['started_at'] >= RETRY_SECONDS:
+            start_live()
+        return GLib.SOURCE_CONTINUE
+
+    def on_activate(app):
+        win = BoardWindow(app, board, bus, start_live)
+        state['win'] = win
+        win.connect('close-request', lambda *_: stop_live() or False)
+        win.present()
+
+        bus.signal_subscribe(BUS, None, None, device_path, None,
+                             Gio.DBusSignalFlags.NONE, on_signal)
+        start_live()
+        GLib.timeout_add_seconds(2, retry_if_not_connected)
+
+    app.connect('activate', on_activate)
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        GLibUnix.signal_add_full(GLib.PRIORITY_DEFAULT, signum, lambda: app.quit() or GLib.SOURCE_REMOVE)
+    try:
+        app.run([])
+    finally:
+        if server:
+            server.terminate()
+
+
+if __name__ == '__main__':
+    main()
