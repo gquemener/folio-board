@@ -75,6 +75,7 @@ press the pad's button at any time.
 | Pressure on/off             | Pressure                        | `p`        |
 | Shapes on/off               | Shapes                          | `o`        |
 | Pen color                   |                                 | `&` to `ç` |
+| Eraser                      |                                 | `à`        |
 | Save as PNG or SVG          | Save                            | `Ctrl+S`   |
 | Copy as SVG                 | Copy                            | `Ctrl+C`   |
 | Pick area to save or copy   | drag with the mouse on the page |            |
@@ -130,7 +131,12 @@ draw the next strokes in another color:
 
 The window briefly names the color you picked, and the header shows the
 current one. Each session starts in black, and strokes keep the color they
-were drawn in. `à`, the next key, does nothing for now.
+were drawn in.
+
+`à`, the next key, picks the **eraser**: the pen then draws nothing, and every
+stroke or shape it touches, within 2.5 mm, goes away whole. The red dot turns
+into a circle showing what the eraser reaches. Pick a color to draw again.
+Erasing cannot be undone.
 
 The red dot shows where the pen hovers, so viewers can follow it before it
 touches the paper.

@@ -41,6 +41,8 @@ class Page:
     # Where the pen hovers, or None when it is out of range.
     hover: Optional[Point] = None
     pen: PenColor = PenColor('Black', (0, 0, 0))
+    # With the eraser picked, how far around the pen it erases, in page units; None when drawing.
+    eraser: Optional[float] = None
 
 
 class ForPresentingDrawings:
@@ -72,6 +74,10 @@ class ForPresentingDrawings:
     def set_color(self, color: int) -> None:
         """Draw the next strokes in this color: its index in the palette, from 0 (black) to 8 (brown),
         the keys & é " ' ( - è _ ç of a French keyboard in that order. Other indexes are left alone."""
+        raise NotImplementedError
+
+    def pick_eraser(self) -> None:
+        """Make the pen erase, until a color is picked: every stroke or shape it touches goes away whole."""
         raise NotImplementedError
 
     def set_shapes(self, on: bool) -> None:

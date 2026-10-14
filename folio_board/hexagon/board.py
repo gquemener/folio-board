@@ -1,4 +1,6 @@
 """The page: strokes and shapes in pad units, how the page is turned, and the area framed for saving."""
+import math
+
 from folio_board.hexagon import palette, shapes
 from folio_board.hexagon.driven.for_remembering_the_drawing import Item, Stroke
 from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Orientation, PenColor
@@ -10,6 +12,8 @@ PEN_MIN_WIDTH_MM = 0.2
 PEN_MAX_WIDTH_MM = 2.4
 # Stroke width on paper when pressure sensitivity is off.
 PEN_FIXED_WIDTH_MM = 0.8
+# The eraser takes away what passes within this distance of the pen.
+ERASER_MM = 2.5
 
 
 class Board:
@@ -23,6 +27,9 @@ class Board:
         self.pressure_max = FALLBACK_PRESSURE_MAX
         self.pressure_sensitive = True
         self.color = 0  # index in palette.COLORS
+        self.erasing = False
+        self.eraser_at = None  # where the pen last touched the paper while erasing
+        self.bounds = {}  # id(item): (item, its bounding box in pad units), worked out once
         # Area to save, as (x0, y0, x1, y1) in view units, or None for the whole page.
         self.crop = None
         self.crop_start = None
@@ -42,19 +49,60 @@ class Board:
         return w - x, h - y  # landscape: the pad's top edge on the right
 
     def pen(self, in_range, x, y, pressure):
+        """Follow the pen; True when it erased something."""
         if not in_range or pressure == 0:
             self.hover = (x, y) if in_range else None
             self.current = None
-            return
+            self.eraser_at = None
+            return False
         self.hover = (x, y)
+        if self.erasing:
+            # Erase along the way from the last report, so a quick swipe misses nothing.
+            start, self.eraser_at = self.eraser_at or (x, y), (x, y)
+            return self.erase(start, (x, y))
         if self.current is None:
             self.current = Stroke(self.color)
             self.items.append(self.current)
         self.current.points.append((x, y, min(pressure / self.pressure_max, 1.0)))
+        return False
+
+    def erase(self, a, b):
+        """Take away every item that passes within ERASER_MM of the segment from a to b."""
+        reach = ERASER_MM * 1000 / UNIT_UM
+        x0, y0 = min(a[0], b[0]) - reach, min(a[1], b[1]) - reach
+        x1, y1 = max(a[0], b[0]) + reach, max(a[1], b[1]) + reach
+        kept = []
+        for item in self.items:
+            ix0, iy0, ix1, iy1 = self.bounds_of(item)
+            near = ix0 <= x1 and x0 <= ix1 and iy0 <= y1 and y0 <= iy1
+            if not (near and any(segment_distance(a, b, p, q) <= reach for p, q in self.lines_of(item))):
+                kept.append(item)
+        erased = len(kept) < len(self.items)
+        self.items = kept
+        return erased
+
+    def lines_of(self, item):
+        """The item's line segments, in pad units: a stroke of a single point is a dot."""
+        if isinstance(item, Stroke):
+            points = [p[:2] for p in item.points]
+            return zip(points, points[1:] or points)
+        return ((p, q) for line, _ in self.sketch(item) for p, q in zip(line, line[1:]))
+
+    def bounds_of(self, item):
+        cached = self.bounds.get(id(item))
+        if cached is None or cached[0] is not item:
+            points = [p for segment in self.lines_of(item) for p in segment]
+            xs, ys = [p[0] for p in points], [p[1] for p in points]
+            cached = self.bounds[id(item)] = (item, (min(xs), min(ys), max(xs), max(ys)))
+        return cached[1]
 
     def pen_color(self):
         name, value = palette.COLORS[self.color]
         return PenColor(name, palette.rgb(value))
+
+    def eraser_reach(self):
+        """How far the eraser reaches, in view units, or None when the pen draws."""
+        return ERASER_MM * 1000 / UNIT_UM if self.erasing else None
 
     def replace(self, strokes, shape):
         """Put shape where the first of these strokes was, and drop them."""
@@ -65,6 +113,7 @@ class Board:
     def clear(self):
         self.items.clear()
         self.sketches.clear()
+        self.bounds.clear()
         self.current = None
 
     def set_orientation(self, orientation: Orientation):
@@ -134,3 +183,20 @@ class Board:
         elif crop and min(crop[2] - crop[0], crop[3] - crop[1]) < min_size:
             self.crop = None  # dragged along a page edge, nothing left to frame
         self.crop_start = self.crop_before = None
+
+
+def segment_distance(a, b, c, d):
+    """Shortest distance between segments ab and cd."""
+    def side(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    if (side(a, b, c) * side(a, b, d) < 0) and (side(c, d, a) * side(c, d, b) < 0):
+        return 0.0  # they cross
+    return min(point_segment_distance(a, c, d), point_segment_distance(b, c, d),
+               point_segment_distance(c, a, b), point_segment_distance(d, a, b))
+
+
+def point_segment_distance(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length2 = dx * dx + dy * dy
+    t = 0 if length2 == 0 else max(0, min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length2))
+    return math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)

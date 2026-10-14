@@ -56,6 +56,7 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         self.shapes = True
         self.grouper = shapes.Grouper()
         self.stroke_started = 0
+        self.erased = False  # the eraser took something away since it touched the paper
 
     def set_presenter(self, presenter: ForNotifyingThePresenter):
         """The presenter's screen is made after the application, since it drives it too."""
@@ -107,8 +108,15 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     def set_color(self, color):
         if 0 <= color < len(palette.COLORS):
             self.board.color = color
+            self.board.erasing = False
             self.presenter.toast(palette.COLORS[color][0])
             self.presenter.page_changed()
+
+    def pick_eraser(self):
+        self.board.erasing = True
+        self.grouper.reset()
+        self.presenter.toast('Eraser')
+        self.presenter.page_changed()
 
     def set_shapes(self, on):
         if on != self.shapes:
@@ -152,7 +160,8 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     def page(self):
         vw, vh = self.board.view_size
         hover = self.board.to_view(*self.board.hover) if self.board.hover else None
-        return Page(vw, vh, self.board.segments(), self.board.crop, hover, self.board.pen_color())
+        return Page(vw, vh, self.board.segments(), self.board.crop, hover, self.board.pen_color(),
+                    self.board.eraser_reach())
 
     def settings(self):
         return Settings(self.board.orientation, self.board.pressure_sensitive, self.shapes)
@@ -160,8 +169,12 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     # ForReceivingPenInput
 
     def pen(self, in_range, x, y, pressure):
-        drawing = self.board.current
-        self.board.pen(in_range, x, y, pressure)
+        drawing, erasing = self.board.current, self.board.eraser_at is not None
+        if self.board.pen(in_range, x, y, pressure):
+            self.erased = True
+        if erasing and self.board.eraser_at is None and self.erased:
+            self.erased = False
+            self._remember()  # the eraser lifted
         if drawing is None and self.board.current is not None:
             self.stroke_started = self.clock.now()
         if drawing is not None and self.board.current is not drawing:

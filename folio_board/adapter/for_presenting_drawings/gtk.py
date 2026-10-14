@@ -23,7 +23,7 @@ from folio_board.lib.cairo_page import draw_paper, draw_strokes  # noqa: E402
 MIN_CROP_PIXELS = 8
 TOAST_MS = 1500
 # The top row of a French AZERTY keyboard, without Shift, picks the palette's colors in order:
-# & é " ' ( - è _ ç. The next key, à, is kept for later.
+# & é " ' ( - è _ ç. The next key, à, picks the eraser.
 COLOR_KEYS = {key: color for color, key in enumerate((
     Gdk.KEY_ampersand, Gdk.KEY_eacute, Gdk.KEY_quotedbl, Gdk.KEY_apostrophe, Gdk.KEY_parenleft,
     Gdk.KEY_minus, Gdk.KEY_egrave, Gdk.KEY_underscore, Gdk.KEY_ccedilla))}
@@ -89,7 +89,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         header.pack_end(self.shapes)
         self.status_label = Gtk.Label(label='Starting…')
         header.pack_end(self.status_label)
-        self.pen_label = Gtk.Label(tooltip_text='Pen color: keys & é " \' ( - è _ ç')
+        self.pen_label = Gtk.Label(tooltip_text='Pen color: keys & é " \' ( - è _ ç; eraser: à')
         header.pack_end(self.pen_label)
         self.show_pen_color()
         self.set_titlebar(header)
@@ -148,6 +148,9 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         elif keyval in COLOR_KEYS:
             self.board.set_color(COLOR_KEYS[keyval])
             self.show_pen_color()
+        elif keyval == Gdk.KEY_agrave:
+            self.board.pick_eraser()
+            self.show_pen_color()
         elif keyval == Gdk.KEY_o:
             self.shapes.set_active(not self.shapes.get_active())
         elif keyval == Gdk.KEY_s and ctrl:
@@ -205,9 +208,12 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
     # Showing the page
 
     def show_pen_color(self):
-        pen = self.board.page().pen
-        hex_color = '#' + ''.join(f'{round(c * 255):02x}' for c in pen.color)
-        self.pen_label.set_markup(f'<span foreground="{hex_color}">⬤</span> {GLib.markup_escape_text(pen.name)}')
+        page = self.board.page()
+        if page.eraser is not None:
+            self.pen_label.set_markup('◯ Eraser')
+            return
+        hex_color = '#' + ''.join(f'{round(c * 255):02x}' for c in page.pen.color)
+        self.pen_label.set_markup(f'<span foreground="{hex_color}">⬤</span> {GLib.markup_escape_text(page.pen.name)}')
 
     def hide_toast(self):
         self.toast_revealer.set_reveal_child(False)
@@ -252,7 +258,13 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
             cr.stroke()
             cr.set_dash([])
 
-        if page.hover:
+        if page.hover and page.eraser is not None:
+            # What the eraser reaches.
+            cr.set_source_rgba(0.9, 0.2, 0.2, 0.8)
+            cr.set_line_width(1.5 / scale)
+            cr.arc(*page.hover, page.eraser, 0, 6.2832)
+            cr.stroke()
+        elif page.hover:
             cr.set_source_rgba(0.9, 0.2, 0.2, 0.7)
             cr.arc(*page.hover, 6 / scale, 0, 6.2832)
             cr.fill()
