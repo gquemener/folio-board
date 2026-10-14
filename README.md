@@ -71,9 +71,13 @@ press the pad's button at any time.
 | Clear the page     | Clear     | `c`        |
 | Undo last stroke   | Undo      | `Ctrl+Z`   |
 | Rotate the page    | Rotate    | `r`        |
+| Pressure on/off    | Pressure  | `p`        |
 | Save as PNG or SVG | Save      | `Ctrl+S`   |
 | Force a reconnect  | Reconnect |            |
 | Quit               |           | `q`, `Esc` |
+
+With **Pressure** checked (the default), pressing harder draws a thicker line.
+Uncheck it to draw every stroke at the same width.
 
 The red dot shows where the pen hovers, so viewers can follow it before it
 touches the paper.

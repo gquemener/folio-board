@@ -7,7 +7,7 @@ created (the cursor stays put) and no root access is needed: we decode the
 UHID_INPUT2 packets ourselves and draw them.
 
 Usage: folio-board [BLUETOOTH_ADDRESS]
-Keys: c clear, Ctrl+Z undo, r rotate, Ctrl+S save, q / Esc quit.
+Keys: c clear, Ctrl+Z undo, r rotate, p pressure on/off, Ctrl+S save, q / Esc quit.
 """
 import os
 import signal
@@ -30,8 +30,16 @@ DEVICE_IFACE = 'org.freedesktop.tuhi1.Device'
 UHID_CREATE2 = 11
 UHID_INPUT2 = 12
 RETRY_SECONDS = 30
-PRESSURE_MAX = 2047
+# Slate / Folio value, used until the UHID report descriptor gives the real one.
+FALLBACK_PRESSURE_MAX = 2047
 POINT_SIZE_UM = 10
+# Stroke width on paper at the lightest and the hardest pressure.
+PEN_MIN_WIDTH_MM = 0.2
+PEN_MAX_WIDTH_MM = 2.4
+# Stroke width on paper when pressure sensitivity is off.
+PEN_FIXED_WIDTH_MM = 0.8
+# Never draw thinner than this in output pixels, so light strokes stay visible.
+MIN_OUTPUT_WIDTH = 1.0
 # A4 Bamboo Folio / Slate size, used until tuhi reads the real one from the pad.
 FALLBACK_DIMENSIONS_UM = (297000, 216000)
 ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape']
@@ -98,6 +106,8 @@ class Board:
         self.strokes = []
         self.current = None
         self.hover = None
+        self.pressure_max = FALLBACK_PRESSURE_MAX
+        self.pressure_sensitive = True
 
     @property
     def view_size(self):
@@ -128,7 +138,19 @@ class Board:
         if self.current is None:
             self.current = []
             self.strokes.append(self.current)
-        self.current.append((x, y, pressure))
+        self.current.append((x, y, min(pressure / self.pressure_max, 1.0)))
+
+
+def rdesc_pressure_max(packet):
+    """Read the Tip Pressure logical maximum from a UHID_CREATE2 packet."""
+    # struct uhid_create2_req: name[128] phys[64] uniq[64] rd_size bus vendor product version country rd_data
+    rd_size = struct.unpack_from('<H', packet, 260)[0]
+    rdesc = packet[280:280 + rd_size]
+    # Usage (Tip Pressure) followed by a 4-byte Logical Maximum, as tuhi writes it.
+    i = rdesc.find(bytes([0x09, 0x30, 0x27]))
+    if i < 0 or i + 7 > len(rdesc):
+        return None
+    return struct.unpack_from('<i', rdesc, i + 3)[0] or None
 
 
 def render_page(cr, board, scale):
@@ -141,20 +163,26 @@ def render_page(cr, board, scale):
     cr.set_line_cap(cairo.LINE_CAP_ROUND)
     cr.set_line_join(cairo.LINE_JOIN_ROUND)
     cr.set_source_rgb(0.08, 0.08, 0.1)
-    base = 2.0 / scale  # minimum ~2 output px so light strokes stay visible
+    floor = MIN_OUTPUT_WIDTH / scale
+    units_per_mm = 1000 / POINT_SIZE_UM
+    min_w, max_w = PEN_MIN_WIDTH_MM * units_per_mm, PEN_MAX_WIDTH_MM * units_per_mm
     for stroke in board.strokes:
         prev = None
         for x, y, p in stroke:
             vx, vy = board.to_view(x, y)
-            cr.set_line_width(base + 30 * p / PRESSURE_MAX)
             if prev is None:
-                cr.move_to(vx, vy)
-                cr.line_to(vx, vy)
+                prev = (vx, vy, p)
+            # Each segment takes the mean pressure of its ends, so width changes smoothly.
+            px, py, pp = prev
+            if board.pressure_sensitive:
+                width = min_w + (max_w - min_w) * (p + pp) / 2
             else:
-                cr.move_to(*prev)
-                cr.line_to(vx, vy)
+                width = PEN_FIXED_WIDTH_MM * units_per_mm
+            cr.set_line_width(max(floor, width))
+            cr.move_to(px, py)
+            cr.line_to(vx, vy)
             cr.stroke()
-            prev = (vx, vy)
+            prev = (vx, vy, p)
 
 
 def export(board, path):
@@ -202,6 +230,10 @@ class BoardWindow(Gtk.ApplicationWindow):
         save = Gtk.Button(label='Save')
         save.connect('clicked', lambda _b: self.save())
         header.pack_end(save)
+        self.pressure = Gtk.CheckButton(label='Pressure', active=board.pressure_sensitive,
+                                        tooltip_text='Vary line width with pen pressure')
+        self.pressure.connect('toggled', self.on_pressure_toggled)
+        header.pack_end(self.pressure)
         self.status = Gtk.Label(label='Starting…')
         header.pack_end(self.status)
         self.set_titlebar(header)
@@ -217,6 +249,8 @@ class BoardWindow(Gtk.ApplicationWindow):
             self.clear()
         elif keyval == Gdk.KEY_r:
             self.rotate()
+        elif keyval == Gdk.KEY_p:
+            self.pressure.set_active(not self.pressure.get_active())
         elif keyval == Gdk.KEY_z and state & Gdk.ModifierType.CONTROL_MASK:
             self.undo()
         elif keyval == Gdk.KEY_s and state & Gdk.ModifierType.CONTROL_MASK:
@@ -247,6 +281,10 @@ class BoardWindow(Gtk.ApplicationWindow):
             self.status.set_label(f'Save failed: {e}')
             return
         self.status.set_label(f'Saved {os.path.basename(path)}')
+
+    def on_pressure_toggled(self, button):
+        self.board.pressure_sensitive = button.get_active()
+        self.area.queue_draw()
 
     def clear(self):
         self.board.strokes.clear()
@@ -315,6 +353,10 @@ def main():
         if kind == UHID_CREATE2:
             set_connected(True)
             set_status('Connected, draw away')
+            try:
+                board.pressure_max = rdesc_pressure_max(packet) or FALLBACK_PRESSURE_MAX
+            except struct.error:
+                board.pressure_max = FALLBACK_PRESSURE_MAX
         elif kind == UHID_INPUT2:
             _report_id, in_range, x, y, pressure = struct.unpack_from('<BBHHH', packet, 6)
             board.pen(in_range, x, y, pressure)
