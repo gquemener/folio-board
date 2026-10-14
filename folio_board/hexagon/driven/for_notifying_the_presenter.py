@@ -6,6 +6,10 @@ class ForNotifyingThePresenter:
         """The page looks different: show it again."""
         raise NotImplementedError
 
+    def settings_changed(self) -> None:
+        """The settings were brought back from the last session: show them on the controls."""
+        raise NotImplementedError
+
     def status(self, text: str) -> None:
         """Show a lasting line about the pad link or the last save."""
         raise NotImplementedError

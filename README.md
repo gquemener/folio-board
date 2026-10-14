@@ -87,6 +87,9 @@ brought back.
 With **Pressure** checked (the default), pressing harder draws a thicker line.
 Uncheck it to draw every stroke at the same width.
 
+The orientation and the **Pressure** setting are kept between sessions too,
+and clearing the drawing leaves them as they are.
+
 ### Colors
 
 A 15 mm band of the pad, starting 15 mm below its top edge (in portrait), is a
@@ -123,7 +126,8 @@ bottom of the page to confirm it.
 
 - In live mode the pad does not store strokes in its memory: folio-board keeps
   them in `~/.local/state/folio-board/drawing.json` (under `$XDG_STATE_HOME`
-  if set), saved each time you lift the pen.
+  if set), saved each time you lift the pen. The settings sit next to it, in
+  `settings.json`.
 - The pad sleeps after a while without use. If strokes stop appearing, press
   its button, then click **Reconnect**.
 - If Tuhi's daemon is installed somewhere other than
@@ -156,6 +160,7 @@ for what it is used for:
 | Driven | Images    | `for_encoding_images`         | cairo (SVG, PNG)                 |
 | Driven | Files     | `for_storing_drawings`        | file system                      |
 | Driven | Memory    | `for_remembering_the_drawing` | JSON file                        |
+| Driven | Memory    | `for_remembering_settings`    | JSON file                        |
 | Driven | Clipboard | `for_sharing_drawings`        | GTK clipboard                    |
 | Driven | Clock     | `for_telling_time`            | monotonic clock                  |
 
@@ -178,9 +183,9 @@ python -m pytest
 
 `tests/hexagon` drives the application through its driver ports, with the test
 doubles of `tests/doubles.py` on the driven ones, so it runs without a pad or a
-display. `tests/adapter` covers UHID decoding, image encoding, storage and the
-kept drawing, and `tests/test_hexagon_isolation.py` checks that the hexagon
-imports nothing from the outside world.
+display. `tests/adapter` covers UHID decoding, image encoding, storage, and the
+kept drawing and settings, and `tests/test_hexagon_isolation.py` checks that
+the hexagon imports nothing from the outside world.
 
 ## License
 

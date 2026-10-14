@@ -22,6 +22,14 @@ class Swatch:
 
 
 @dataclass(frozen=True)
+class Settings:
+    """How the page is shown and drawn. They last from one session to the next; clearing keeps them."""
+    orientation: Orientation = 'portrait'
+    # Vary line width with pen pressure.
+    pressure_sensitive: bool = True
+
+
+@dataclass(frozen=True)
 class Page:
     """The page as shown, in page units: turned to the current orientation."""
     width: float
@@ -38,7 +46,8 @@ class Page:
 
 class ForPresentingDrawings:
     def start(self) -> None:
-        """Bring back the drawing kept from the last session, then begin listening to the pad."""
+        """Bring back the settings and the drawing kept from the last session,
+        then begin listening to the pad."""
         raise NotImplementedError
 
     def stop(self) -> None:
@@ -87,4 +96,7 @@ class ForPresentingDrawings:
         raise NotImplementedError
 
     def page(self) -> Page:
+        raise NotImplementedError
+
+    def settings(self) -> Settings:
         raise NotImplementedError

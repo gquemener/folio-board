@@ -6,11 +6,12 @@ from folio_board.hexagon.board import FALLBACK_PRESSURE_MAX, Board
 from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
 from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError
 from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingThePresenter
+from folio_board.hexagon.driven.for_remembering_settings import ForRememberingSettings, SettingsError
 from folio_board.hexagon.driven.for_remembering_the_drawing import ForRememberingTheDrawing, RememberingError
 from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings
 from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
 from folio_board.hexagon.driven.for_telling_time import ForTellingTime
-from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, ForPresentingDrawings, Page
+from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, ForPresentingDrawings, Page, Settings
 from folio_board.hexagon.driver.for_receiving_pen_input import ForReceivingPenInput
 
 # The pad link tries to reach the pad for ~25 s per start, then gives up: start again after this.
@@ -23,6 +24,9 @@ class _NoPresenter(ForNotifyingThePresenter):
     """Stands in until the presenter's screen exists."""
 
     def page_changed(self):
+        pass
+
+    def settings_changed(self):
         pass
 
     def status(self, text):
@@ -39,13 +43,13 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
 
     def __init__(self, pad_size_um, pad: ForLinkingThePad, encoder: ForEncodingImages,
                  storage: ForStoringDrawings, sharing: ForSharingDrawings, clock: ForTellingTime,
-                 memory: ForRememberingTheDrawing):
+                 memory: ForRememberingTheDrawing, settings_memory: ForRememberingSettings):
         w_um, h_um = pad_size_um
         if not w_um or not h_um:
             w_um, h_um = FALLBACK_DIMENSIONS_UM
         self.board = Board(w_um // UNIT_UM, h_um // UNIT_UM)
         self.pad, self.encoder, self.storage, self.sharing, self.clock = pad, encoder, storage, sharing, clock
-        self.memory = memory
+        self.memory, self.settings_memory = memory, settings_memory
         self.presenter: ForNotifyingThePresenter = _NoPresenter()
         self.connected = False
         self.started_at = 0
@@ -57,6 +61,13 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     # ForPresentingDrawings
 
     def start(self):
+        try:
+            settings = self.settings_memory.recall()
+            self.board.set_orientation(settings.orientation)
+            self.board.pressure_sensitive = settings.pressure_sensitive
+        except SettingsError as e:
+            self.presenter.toast(f'Could not restore the settings: {e}')
+        self.presenter.settings_changed()
         try:
             self.board.strokes = self.memory.recall()
         except RememberingError as e:
@@ -77,12 +88,16 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         self.presenter.page_changed()
 
     def set_orientation(self, orientation):
-        self.board.set_orientation(orientation)
-        self.presenter.page_changed()
+        if orientation != self.board.orientation:
+            self.board.set_orientation(orientation)
+            self._remember_settings()
+            self.presenter.page_changed()
 
     def set_pressure_sensitive(self, on):
-        self.board.pressure_sensitive = on
-        self.presenter.page_changed()
+        if on != self.board.pressure_sensitive:
+            self.board.pressure_sensitive = on
+            self._remember_settings()
+            self.presenter.page_changed()
 
     def begin_crop(self, at):
         self.board.begin_crop(at)
@@ -122,6 +137,9 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         hover = self.board.to_view(*self.board.hover) if self.board.hover else None
         return Page(vw, vh, self.board.segments(), self.board.crop, hover, self.board.swatches())
 
+    def settings(self):
+        return Settings(self.board.orientation, self.board.pressure_sensitive)
+
     # ForReceivingPenInput
 
     def pen(self, in_range, x, y, pressure):
@@ -156,6 +174,12 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
             self.memory.remember(self.board.strokes)
         except RememberingError as e:
             self.presenter.status(f'Could not keep the drawing: {e}')
+
+    def _remember_settings(self):
+        try:
+            self.settings_memory.remember(self.settings())
+        except SettingsError as e:
+            self.presenter.status(f'Could not keep the settings: {e}')
 
     def _start_live(self):
         self.pad.stop_live()

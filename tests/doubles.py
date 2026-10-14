@@ -4,10 +4,12 @@ import copy
 from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
 from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError
 from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingThePresenter
+from folio_board.hexagon.driven.for_remembering_settings import ForRememberingSettings, SettingsError
 from folio_board.hexagon.driven.for_remembering_the_drawing import ForRememberingTheDrawing, RememberingError
 from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings
 from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
 from folio_board.hexagon.driven.for_telling_time import ForTellingTime
+from folio_board.hexagon.driver.for_presenting_drawings import Settings
 
 
 class FakePad(ForLinkingThePad):
@@ -73,6 +75,26 @@ class InMemoryMemory(ForRememberingTheDrawing):
         return copy.deepcopy(self.strokes)
 
 
+class InMemorySettings(ForRememberingSettings):
+    """ForRememberingSettings."""
+
+    def __init__(self, settings=Settings()):
+        self.settings = settings
+        self.remembered = 0
+        self.error = None
+
+    def remember(self, settings):
+        if self.error:
+            raise SettingsError(self.error)
+        self.settings = settings
+        self.remembered += 1
+
+    def recall(self):
+        if self.error:
+            raise SettingsError(self.error)
+        return self.settings
+
+
 class SharingSpy(ForSharingDrawings):
     """ForSharingDrawings."""
 
@@ -90,10 +112,14 @@ class PresenterSpy(ForNotifyingThePresenter):
         self.statuses = []
         self.toasts = []
         self.redraws = 0
+        self.settings_shown = 0
         self.reconnect = None
 
     def page_changed(self):
         self.redraws += 1
+
+    def settings_changed(self):
+        self.settings_shown += 1
 
     def status(self, text):
         self.statuses.append(text)

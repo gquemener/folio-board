@@ -56,7 +56,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         clear = Gtk.Button(label='Clear')
         clear.connect('clicked', lambda _b: self.confirm_clear())
         header.pack_start(clear)
-        # The page starts in portrait, in the application too.
+        # The orientation and pressure controls show the application's settings once it starts.
         self.portrait = Gtk.ToggleButton(label='Portrait', active=True)
         self.landscape = Gtk.ToggleButton(label='Landscape', group=self.portrait)
         self.landscape.connect('toggled', lambda b: board.set_orientation(
@@ -74,7 +74,6 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         copy = Gtk.Button(label='Copy', tooltip_text='Copy as SVG, to paste in Figma or Inkscape')
         copy.connect('clicked', lambda _b: board.copy())
         header.pack_end(copy)
-        # Pressure sensitivity starts on, in the application too.
         self.pressure = Gtk.CheckButton(label='Pressure', active=True,
                                         tooltip_text='Vary line width with pen pressure')
         self.pressure.connect('toggled', lambda b: board.set_pressure_sensitive(b.get_active()))
@@ -98,6 +97,13 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
 
     def page_changed(self):
         self.area.queue_draw()
+
+    def settings_changed(self):
+        # Showing a setting fires its control's toggled handler, which the application ignores
+        # when nothing changes.
+        settings = self.board.settings()
+        (self.landscape if settings.orientation == 'landscape' else self.portrait).set_active(True)
+        self.pressure.set_active(settings.pressure_sensitive)
 
     def status(self, text):
         self.status_label.set_label(text)

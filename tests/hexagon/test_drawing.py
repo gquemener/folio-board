@@ -2,7 +2,8 @@
 import pytest
 
 from folio_board.hexagon.application import FALLBACK_DIMENSIONS_UM, FolioBoard
-from tests.doubles import FakeClock, FakePad, InMemoryMemory, InMemoryStorage, SharingSpy, StubEncoder
+from tests.doubles import (FakeClock, FakePad, InMemoryMemory, InMemorySettings, InMemoryStorage, SharingSpy,
+                           StubEncoder)
 
 
 def draw(app, *points, pressure=1024):
@@ -20,7 +21,7 @@ def test_page_is_the_pad_turned_to_portrait(world):
 
 def test_unknown_pad_size_falls_back_to_a4():
     app = FolioBoard((0, 0), FakePad(), StubEncoder(), InMemoryStorage(), SharingSpy(), FakeClock(),
-                     InMemoryMemory())
+                     InMemoryMemory(), InMemorySettings())
     assert app.view_size() == (FALLBACK_DIMENSIONS_UM[1] // 10, FALLBACK_DIMENSIONS_UM[0] // 10)
 
 
