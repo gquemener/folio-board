@@ -7,15 +7,22 @@ MIN_OUTPUT_WIDTH = 1.0
 
 def draw_page(cr, page, scale):
     """Draw the white page and its strokes; cr is already scaled to page units, by scale."""
+    draw_paper(cr, page)
+    draw_strokes(cr, page, scale)
+
+
+def draw_paper(cr, page):
     cr.rectangle(0, 0, page.width, page.height)
     cr.set_source_rgb(1, 1, 1)
     cr.fill()
 
+
+def draw_strokes(cr, page, scale):
     cr.set_line_cap(cairo.LINE_CAP_ROUND)
     cr.set_line_join(cairo.LINE_JOIN_ROUND)
-    cr.set_source_rgb(0.08, 0.08, 0.1)
     floor = MIN_OUTPUT_WIDTH / scale
-    for x0, y0, x1, y1, width in page.segments:
+    for x0, y0, x1, y1, width, color in page.segments:
+        cr.set_source_rgb(*color)
         cr.set_line_width(max(floor, width))
         cr.move_to(x0, y0)
         cr.line_to(x1, y1)

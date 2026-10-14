@@ -8,8 +8,9 @@ cairo = pytest.importorskip('cairo')
 from folio_board.adapter.for_encoding_images.cairo import CairoEncoder  # noqa: E402
 from folio_board.hexagon.driver.for_presenting_drawings import Page  # noqa: E402
 
-A4_PORTRAIT = Page(21600, 29700, ((1000, 1000, 5000, 8000, 50),), hover=(300, 300))
-CROPPED = Page(21600, 29700, ((1000, 1000, 5000, 8000, 50),), crop=(1000, 1000, 8000, 5000))
+BLACK = (0, 0, 0)
+A4_PORTRAIT = Page(21600, 29700, ((1000, 1000, 5000, 8000, 50, BLACK),), hover=(300, 300))
+CROPPED = Page(21600, 29700, ((1000, 1000, 5000, 8000, 50, BLACK),), crop=(1000, 1000, 8000, 5000))
 
 
 def png_size(data):
@@ -37,7 +38,7 @@ def test_svg_is_true_to_paper_size():
 
 
 def test_png_draws_the_stroke():
-    data = CairoEncoder().encode(Page(1000, 1000, ((0, 500, 1000, 500, 100),)), 'png')
+    data = CairoEncoder().encode(Page(1000, 1000, ((0, 500, 1000, 500, 100, BLACK),)), 'png')
     surface = cairo.ImageSurface.create_from_png(io.BytesIO(data))
     stride, pixels = surface.get_stride(), surface.get_data()
     def pixel(x, y):

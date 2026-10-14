@@ -1,5 +1,8 @@
 """The page: strokes in pad units, how the page is turned, and the area framed for saving."""
-from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM
+from dataclasses import dataclass, field
+
+from folio_board.hexagon import palette
+from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Swatch
 
 # Slate / Folio value, used until the pad reports the real one.
 FALLBACK_PRESSURE_MAX = 2047
@@ -9,6 +12,13 @@ PEN_MAX_WIDTH_MM = 2.4
 # Stroke width on paper when pressure sensitivity is off.
 PEN_FIXED_WIDTH_MM = 0.8
 ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape']
+STRIP_UNITS = palette.STRIP_MM * 1000 // UNIT_UM
+
+
+@dataclass
+class Stroke:
+    color: int  # index in palette.COLORS
+    points: list = field(default_factory=list)  # (x, y, pressure from 0 to 1), in pad units
 
 
 class Board:
@@ -20,6 +30,9 @@ class Board:
         self.hover = None
         self.pressure_max = FALLBACK_PRESSURE_MAX
         self.pressure_sensitive = True
+        self.color = 0
+        # The pen went down on the palette strip and has not been lifted since.
+        self.picking = False
         # Area to save, as (x0, y0, x1, y1) in view units, or None for the whole page.
         self.crop = None
         self.crop_start = None
@@ -43,18 +56,47 @@ class Board:
         return x, y
 
     def pen(self, in_range, x, y, pressure):
-        if not in_range:
-            self.hover = None
+        """Follow the pen; True when it just picked a color on the palette strip."""
+        if not in_range or pressure == 0:
+            self.hover = (x, y) if in_range else None
             self.current = None
-            return
+            self.picking = False
+            return False
         self.hover = (x, y)
-        if pressure == 0:
-            self.current = None
-            return
+        if self.picking:
+            return False  # wait for the pen to lift, so a slide off the strip draws nothing
         if self.current is None:
-            self.current = []
+            swatch = self.swatch_at(x, y)
+            if swatch is not None:
+                self.color = swatch
+                self.picking = True
+                return True
+            self.current = Stroke(self.color)
             self.strokes.append(self.current)
-        self.current.append((x, y, min(pressure / self.pressure_max, 1.0)))
+        self.current.points.append((x, y, min(pressure / self.pressure_max, 1.0)))
+        return False
+
+    def to_portrait(self, x, y):
+        """Pad units to the page as shown in portrait, where the palette strip is along the top."""
+        return self.pad_h - y, x
+
+    def swatch_at(self, x, y):
+        """Index of the palette color under pad point (x, y), or None off the strip."""
+        px, py = self.to_portrait(x, y)
+        if not (0 <= py < STRIP_UNITS and 0 <= px <= self.pad_h):
+            return None
+        return min(int(px * len(palette.COLORS) // self.pad_h), len(palette.COLORS) - 1)
+
+    def swatches(self):
+        """The palette strip's boxes, in view units."""
+        n = len(palette.COLORS)
+        swatches = []
+        for i, (name, value) in enumerate(palette.COLORS):
+            # Box i spans portrait x from i/n to (i+1)/n of the strip: pad y counts the other way.
+            (ax, ay), (bx, by) = self.to_view(0, self.pad_h * (n - i) / n), self.to_view(STRIP_UNITS, self.pad_h * (n - i - 1) / n)
+            rect = (min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))
+            swatches.append(Swatch(rect, palette.rgb(value), name, i == self.color))
+        return tuple(swatches)
 
     def clear(self):
         self.strokes.clear()
@@ -71,13 +113,14 @@ class Board:
         self.crop = None  # it framed the page as it was turned before
 
     def segments(self):
-        """Line segments (x0, y0, x1, y1, width) in view units; a stroke's first point is a dot."""
+        """Line segments (x0, y0, x1, y1, width, color) in view units; a stroke's first point is a dot."""
         units_per_mm = 1000 / UNIT_UM
         min_w, max_w = PEN_MIN_WIDTH_MM * units_per_mm, PEN_MAX_WIDTH_MM * units_per_mm
         segments = []
         for stroke in self.strokes:
+            color = palette.rgb(palette.COLORS[stroke.color][1])
             prev = None
-            for x, y, p in stroke:
+            for x, y, p in stroke.points:
                 vx, vy = self.to_view(x, y)
                 if prev is None:
                     prev = (vx, vy, p)
@@ -87,7 +130,7 @@ class Board:
                     width = min_w + (max_w - min_w) * (p + pp) / 2
                 else:
                     width = PEN_FIXED_WIDTH_MM * units_per_mm
-                segments.append((px, py, vx, vy, width))
+                segments.append((px, py, vx, vy, width, color))
                 prev = (vx, vy, p)
         return tuple(segments)
 

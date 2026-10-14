@@ -15,6 +15,7 @@ def test_page_is_the_pad_turned_to_portrait(world):
     assert world.app.view_size() == (14800, 21000)
     page = world.app.page()
     assert (page.width, page.height, page.segments, page.crop, page.hover) == (14800, 21000, (), None, None)
+    assert len(page.palette) == 16
 
 
 def test_unknown_pad_size_falls_back_to_a4():
@@ -30,16 +31,16 @@ def test_pad_resize_changes_page_and_ignores_empty_sizes(world):
 
 
 def test_pen_down_draws_a_stroke_and_redraws(world):
-    draw(world.app, (100, 200), (300, 400))
+    draw(world.app, (3100, 200), (3300, 400))
     segments = world.app.page().segments
     # Portrait shows pad (x, y) at (width - y, x); the first point is a dot.
-    assert [s[:4] for s in segments] == [(14600, 100, 14600, 100), (14600, 100, 14400, 300)]
+    assert [s[:4] for s in segments] == [(14600, 3100, 14600, 3100), (14600, 3100, 14400, 3300)]
     assert world.presenter.redraws == 3
 
 
 def test_lifting_the_pen_starts_a_new_stroke(world):
-    draw(world.app, (100, 100), (200, 200))
-    draw(world.app, (500, 500))
+    draw(world.app, (3100, 100), (3200, 200))
+    draw(world.app, (3500, 500))
     assert len(world.app.page().segments) == 3
     world.app.undo()
     assert len(world.app.page().segments) == 2
@@ -48,8 +49,8 @@ def test_lifting_the_pen_starts_a_new_stroke(world):
 
 
 def test_hover_follows_the_pen_until_it_leaves(world):
-    world.app.pen(True, 100, 200, 0)
-    assert world.app.page().hover == (14600, 100)
+    world.app.pen(True, 3100, 200, 0)
+    assert world.app.page().hover == (14600, 3100)
     assert world.app.page().segments == ()
     world.app.pen(False, 0, 0, 0)
     assert world.app.page().hover is None
@@ -64,39 +65,39 @@ def test_hover_follows_the_pen_until_it_leaves(world):
 ])
 def test_pressure_sets_line_width(world, pressure_max, pressure, width):
     world.app.pad_connected(pressure_max)
-    world.app.pen(True, 10, 10, pressure)
+    world.app.pen(True, 3010, 10, pressure)
     segments = world.app.page().segments
     assert (segments[0][4] if segments else None) == pytest.approx(width)
 
 
 def test_light_pressure_draws_thin_lines(world):
     world.app.pad_connected(2000)
-    world.app.pen(True, 10, 10, 1)
+    world.app.pen(True, 3010, 10, 1)
     assert world.app.page().segments[0][4] == pytest.approx(20 + 220 / 2000)
 
 
 def test_without_pressure_sensitivity_every_line_is_0_8_mm(world):
     world.app.set_pressure_sensitive(False)
-    draw(world.app, (10, 10), (20, 20), pressure=2047)
+    draw(world.app, (3010, 10), (3020, 20), pressure=2047)
     assert [s[4] for s in world.app.page().segments] == pytest.approx([80, 80])
 
 
 def test_segments_average_the_pressure_of_their_ends(world):
     world.app.pad_connected(2000)
-    world.app.pen(True, 10, 10, 0 + 1)
-    world.app.pen(True, 20, 20, 2000)
+    world.app.pen(True, 3010, 10, 1)
+    world.app.pen(True, 3020, 20, 2000)
     assert world.app.page().segments[1][4] == pytest.approx(20 + 220 * (1 / 2000 + 1) / 2)
 
 
 @pytest.mark.parametrize('turns, size, point', [
-    (0, (14800, 21000), (14600, 100)),   # portrait
-    (1, (21000, 14800), (100, 200)),     # landscape
-    (2, (14800, 21000), (200, 20900)),   # reverse portrait
-    (3, (21000, 14800), (20900, 14600)),  # reverse landscape
-    (4, (14800, 21000), (14600, 100)),   # full turn
+    (0, (14800, 21000), (14600, 3100)),   # portrait
+    (1, (21000, 14800), (3100, 200)),     # landscape
+    (2, (14800, 21000), (200, 17900)),    # reverse portrait
+    (3, (21000, 14800), (17900, 14600)),  # reverse landscape
+    (4, (14800, 21000), (14600, 3100)),   # full turn
 ])
 def test_rotating_turns_the_page(world, turns, size, point):
-    world.app.pen(True, 100, 200, 1000)
+    world.app.pen(True, 3100, 200, 1000)
     for _ in range(turns):
         world.app.rotate()
     page = world.app.page()

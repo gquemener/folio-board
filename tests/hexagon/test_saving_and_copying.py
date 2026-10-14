@@ -11,7 +11,7 @@ def test_save_picks_the_format_from_the_extension(world):
 
 
 def test_save_encodes_the_page_with_its_crop(world):
-    world.app.pen(True, 100, 100, 500)
+    world.app.pen(True, 3100, 100, 500)
     world.app.begin_crop((0, 0))
     world.app.drag_crop((4000, 3000))
     world.app.end_crop(False, 10)

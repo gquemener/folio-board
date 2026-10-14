@@ -8,6 +8,16 @@ UNIT_MM = UNIT_UM / 1000
 
 Point = tuple[float, float]
 Rect = tuple[float, float, float, float]  # x0, y0, x1, y1
+Color = tuple[float, float, float]  # red, green, blue, from 0 to 1
+
+
+@dataclass(frozen=True)
+class Swatch:
+    """One box of the palette strip: tapping it with the pen picks its color."""
+    rect: Rect
+    color: Color
+    name: str
+    selected: bool
 
 
 @dataclass(frozen=True)
@@ -15,12 +25,14 @@ class Page:
     """The page as shown, in page units: turned to the current orientation."""
     width: float
     height: float
-    # Line segments (x0, y0, x1, y1, line width), in drawing order.
-    segments: tuple[tuple[float, float, float, float, float], ...]
+    # Line segments (x0, y0, x1, y1, line width, color), in drawing order.
+    segments: tuple[tuple[float, float, float, float, float, Color], ...]
     # Area to save or copy, or None for the whole page.
     crop: Optional[Rect] = None
     # Where the pen hovers, or None when it is out of range.
     hover: Optional[Point] = None
+    # The palette strip along the pad's top edge. It is not part of the drawing.
+    palette: tuple[Swatch, ...] = ()
 
 
 class ForPresentingDrawings:

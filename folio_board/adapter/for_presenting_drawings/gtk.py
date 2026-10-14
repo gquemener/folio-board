@@ -17,7 +17,7 @@ import cairo  # noqa: E402
 
 from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingThePresenter  # noqa: E402
 from folio_board.hexagon.driver.for_presenting_drawings import ForPresentingDrawings  # noqa: E402
-from folio_board.lib.cairo_page import draw_page  # noqa: E402
+from folio_board.lib.cairo_page import draw_paper, draw_strokes  # noqa: E402
 
 # A crop drag shorter than this, in screen pixels, is a click: outside the crop it drops it.
 MIN_CROP_PIXELS = 8
@@ -176,6 +176,28 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         ox, oy, scale = self.page_transform()
         return (x - ox) / scale, (y - oy) / scale
 
+    def draw_palette(self, cr, page, scale):
+        """The palette strip, under the strokes, with the selected color framed."""
+        for swatch in page.palette:
+            x0, y0, x1, y1 = swatch.rect
+            cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+            cr.set_source_rgb(*swatch.color)
+            cr.fill_preserve()
+            cr.set_source_rgb(0.75, 0.75, 0.78)
+            cr.set_line_width(1 / scale)
+            cr.stroke()
+        for swatch in page.palette:
+            if swatch.selected:
+                x0, y0, x1, y1 = swatch.rect
+                inset = 2.5 / scale
+                cr.rectangle(x0 + inset, y0 + inset, x1 - x0 - 2 * inset, y1 - y0 - 2 * inset)
+                cr.set_source_rgb(0.15, 0.15, 0.18)
+                cr.set_line_width(3 / scale)
+                cr.stroke_preserve()
+                cr.set_source_rgb(1, 1, 1)
+                cr.set_line_width(1 / scale)
+                cr.stroke()
+
     def on_draw(self, _area, cr, _width, _height):
         cr.set_source_rgb(0.18, 0.18, 0.2)
         cr.paint()
@@ -184,7 +206,9 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         ox, oy, scale = self.page_transform()
         cr.translate(ox, oy)
         cr.scale(scale, scale)
-        draw_page(cr, page, scale)
+        draw_paper(cr, page)
+        self.draw_palette(cr, page, scale)
+        draw_strokes(cr, page, scale)
 
         if page.crop:
             # Shade what the save leaves out and outline what it keeps.

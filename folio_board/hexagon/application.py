@@ -1,6 +1,7 @@
 """FolioBoard: the application, as its driver actors (presenter and pad) see it."""
 import os
 
+from folio_board.hexagon import palette
 from folio_board.hexagon.board import FALLBACK_PRESSURE_MAX, Board
 from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
 from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError
@@ -113,12 +114,13 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     def page(self):
         vw, vh = self.board.view_size
         hover = self.board.to_view(*self.board.hover) if self.board.hover else None
-        return Page(vw, vh, self.board.segments(), self.board.crop, hover)
+        return Page(vw, vh, self.board.segments(), self.board.crop, hover, self.board.swatches())
 
     # ForReceivingPenInput
 
     def pen(self, in_range, x, y, pressure):
-        self.board.pen(in_range, x, y, pressure)
+        if self.board.pen(in_range, x, y, pressure):
+            self.presenter.toast(palette.COLORS[self.board.color][0])
         self.presenter.page_changed()
 
     def pad_connected(self, pressure_max):
