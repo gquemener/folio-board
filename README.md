@@ -73,6 +73,7 @@ press the pad's button at any time.
 | Rotate the page    | Rotate    | `r`        |
 | Pressure on/off    | Pressure  | `p`        |
 | Save as PNG or SVG | Save      | `Ctrl+S`   |
+| Pick area to save  | drag with the mouse on the page | |
 | Force a reconnect  | Reconnect |            |
 | Quit               |           | `q`, `Esc` |
 
@@ -86,6 +87,11 @@ Save opens a file dialog in your Pictures folder. The format follows the file
 extension: `.svg` gives a vector file at the paper's real size, anything else a
 200 DPI PNG. The saved page uses the board's current rotation and leaves out the
 hover dot.
+
+To save only part of the page, drag a rectangle over it with the mouse first:
+the rest is shaded and Save keeps only the framed area. Drag again to change it,
+or click outside the framed area to go back to saving the whole page. Rotating the page
+drops the crop.
 
 ## Good to know
 

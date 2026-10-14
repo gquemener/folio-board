@@ -8,6 +8,7 @@ UHID_INPUT2 packets ourselves and draw them.
 
 Usage: folio-board [BLUETOOTH_ADDRESS]
 Keys: c clear, Ctrl+Z undo, r rotate, p pressure on/off, Ctrl+S save, q / Esc quit.
+Drag with the mouse to pick the area to save; click outside it to save the whole page again.
 """
 import os
 import signal
@@ -45,6 +46,8 @@ FALLBACK_DIMENSIONS_UM = (297000, 216000)
 ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape']
 
 PNG_DPI = 200
+# A crop drag shorter than this, in screen pixels, is a click: outside the crop it drops it.
+MIN_CROP_PIXELS = 8
 MM_PER_INCH = 25.4
 
 MANAGER_PATH = '/org/freedesktop/tuhi1'
@@ -108,6 +111,8 @@ class Board:
         self.hover = None
         self.pressure_max = FALLBACK_PRESSURE_MAX
         self.pressure_sensitive = True
+        # Area to save, as (x0, y0, x1, y1) in view units, or None for the whole page.
+        self.crop = None
 
     @property
     def view_size(self):
@@ -186,17 +191,20 @@ def render_page(cr, board, scale):
 
 
 def export(board, path):
-    """Save the page as SVG (sized in points, true to paper) or, otherwise, PNG."""
+    """Save the page, or its crop, as SVG (sized in points, true to paper) or, otherwise, PNG."""
     vw, vh = board.view_size
+    x0, y0, x1, y1 = board.crop or (0, 0, vw, vh)
+    w, h = x1 - x0, y1 - y0
     mm_per_unit = POINT_SIZE_UM / 1000
     if path.lower().endswith('.svg'):
         scale = mm_per_unit * 72 / MM_PER_INCH
-        surface = cairo.SVGSurface(path, vw * scale, vh * scale)
+        surface = cairo.SVGSurface(path, w * scale, h * scale)
     else:
         scale = mm_per_unit * PNG_DPI / MM_PER_INCH
-        surface = cairo.ImageSurface(cairo.FORMAT_RGB24, round(vw * scale), round(vh * scale))
+        surface = cairo.ImageSurface(cairo.FORMAT_RGB24, max(1, round(w * scale)), max(1, round(h * scale)))
     cr = cairo.Context(surface)
     cr.scale(scale, scale)
+    cr.translate(-x0, -y0)
     render_page(cr, board, scale)
     if isinstance(surface, cairo.ImageSurface):
         surface.write_to_png(path)
@@ -238,6 +246,14 @@ class BoardWindow(Gtk.ApplicationWindow):
         header.pack_end(self.status)
         self.set_titlebar(header)
 
+        drag = Gtk.GestureDrag(button=Gdk.BUTTON_PRIMARY)
+        drag.connect('drag-begin', self.on_crop_begin)
+        drag.connect('drag-update', self.on_crop_update)
+        drag.connect('drag-end', self.on_crop_end)
+        self.area.add_controller(drag)
+        self.crop_start = None
+        self.crop_before = None
+
         keys = Gtk.EventControllerKey()
         keys.connect('key-pressed', self.on_key)
         self.add_controller(keys)
@@ -256,6 +272,44 @@ class BoardWindow(Gtk.ApplicationWindow):
         elif keyval == Gdk.KEY_s and state & Gdk.ModifierType.CONTROL_MASK:
             self.save()
         return True
+
+    def page_transform(self):
+        """Offset and scale that fit the page, centred, in the drawing area."""
+        width, height = self.area.get_width(), self.area.get_height()
+        vw, vh = self.board.view_size
+        scale = min(width / vw, height / vh)
+        return (width - vw * scale) / 2, (height - vh * scale) / 2, scale
+
+    def to_page(self, x, y):
+        """Widget coordinates to view units, clamped to the page."""
+        ox, oy, scale = self.page_transform()
+        vw, vh = self.board.view_size
+        return min(max((x - ox) / scale, 0), vw), min(max((y - oy) / scale, 0), vh)
+
+    def on_crop_begin(self, _gesture, x, y):
+        self.crop_start = (x, y)
+        self.crop_before = self.board.crop
+
+    def on_crop_update(self, _gesture, dx, dy):
+        sx, sy = self.crop_start
+        (ax, ay), (bx, by) = self.to_page(sx, sy), self.to_page(sx + dx, sy + dy)
+        self.board.crop = (min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))
+        self.area.queue_draw()
+
+    def on_crop_end(self, _gesture, dx, dy):
+        crop = self.board.crop
+        ox, oy, scale = self.page_transform()
+        if abs(dx) < MIN_CROP_PIXELS and abs(dy) < MIN_CROP_PIXELS:
+            # A click keeps the crop it lands in and drops it anywhere else.
+            sx, sy = self.crop_start
+            px, py = (sx - ox) / scale, (sy - oy) / scale
+            before = self.crop_before
+            inside = before and before[0] <= px <= before[2] and before[1] <= py <= before[3]
+            self.board.crop = before if inside else None
+        elif crop and min(crop[2] - crop[0], crop[3] - crop[1]) * scale < MIN_CROP_PIXELS:
+            self.board.crop = None  # dragged along a page edge, nothing left to frame
+        self.area.queue_draw()
+        self.crop_start = self.crop_before = None
 
     def save(self):
         filters = Gio.ListStore.new(Gtk.FileFilter)
@@ -300,6 +354,7 @@ class BoardWindow(Gtk.ApplicationWindow):
     def rotate(self):
         i = ORIENTATIONS.index(self.board.orientation)
         self.board.orientation = ORIENTATIONS[(i + 1) % len(ORIENTATIONS)]
+        self.board.crop = None  # it framed the page as it was turned before
         self.area.queue_draw()
 
     def on_draw(self, _area, cr, width, height):
@@ -307,10 +362,25 @@ class BoardWindow(Gtk.ApplicationWindow):
         cr.paint()
 
         vw, vh = self.board.view_size
-        scale = min(width / vw, height / vh)
-        cr.translate((width - vw * scale) / 2, (height - vh * scale) / 2)
+        ox, oy, scale = self.page_transform()
+        cr.translate(ox, oy)
         cr.scale(scale, scale)
         render_page(cr, self.board, scale)
+
+        if self.board.crop:
+            # Shade what the save leaves out and outline what it keeps.
+            x0, y0, x1, y1 = self.board.crop
+            cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
+            cr.rectangle(0, 0, vw, vh)
+            cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+            cr.set_source_rgba(0, 0, 0, 0.25)
+            cr.fill()
+            cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+            cr.set_source_rgb(0.2, 0.45, 0.9)
+            cr.set_line_width(1.5 / scale)
+            cr.set_dash([6 / scale, 4 / scale])
+            cr.stroke()
+            cr.set_dash([])
 
         if self.board.hover:
             vx, vy = self.board.to_view(*self.board.hover)
