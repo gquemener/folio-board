@@ -97,7 +97,8 @@ drops the crop.
 Copy puts the same page, or the framed area, on the clipboard as SVG, ready to
 paste into Figma, Inkscape or a slide. It is offered as `image/svg+xml`, as
 plain text (the SVG markup, which is what web apps like Figma read) and as a PNG
-for apps that only take pixels.
+for apps that only take pixels. A **Copied** message briefly appears at the
+bottom of the page to confirm it.
 
 ## Good to know
 

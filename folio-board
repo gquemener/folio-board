@@ -51,6 +51,8 @@ ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape'
 PNG_DPI = 200
 # A crop drag shorter than this, in screen pixels, is a click: outside the crop it drops it.
 MIN_CROP_PIXELS = 8
+TOAST_MS = 1500
+TOAST_CSS = '.toast { background: rgba(0, 0, 0, 0.75); color: white; border-radius: 99px; padding: 8px 20px; }'
 MM_PER_INCH = 25.4
 
 MANAGER_PATH = '/org/freedesktop/tuhi1'
@@ -233,7 +235,19 @@ class BoardWindow(Gtk.ApplicationWindow):
 
         self.area = Gtk.DrawingArea()
         self.area.set_draw_func(self.on_draw)
-        self.set_child(self.area)
+        # A short message over the page, e.g. after copying; it lets clicks through to the page.
+        self.toast = Gtk.Label(css_classes=['toast'])
+        self.toast_revealer = Gtk.Revealer(child=self.toast, can_target=False,
+                                           transition_type=Gtk.RevealerTransitionType.CROSSFADE,
+                                           halign=Gtk.Align.CENTER, valign=Gtk.Align.END, margin_bottom=32)
+        self.toast_timeout = None
+        css = Gtk.CssProvider()
+        css.load_from_string(TOAST_CSS)
+        Gtk.StyleContext.add_provider_for_display(self.get_display(), css,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        overlay = Gtk.Overlay(child=self.area)
+        overlay.add_overlay(self.toast_revealer)
+        self.set_child(overlay)
 
         header = Gtk.HeaderBar()
         for label, handler in (('Clear', self.clear), ('Undo', self.undo), ('Rotate', self.rotate), ('Reconnect', reconnect)):
@@ -341,7 +355,19 @@ class BoardWindow(Gtk.ApplicationWindow):
             Gdk.ContentProvider.new_for_bytes('text/plain;charset=utf-8', svg),
             Gdk.ContentProvider.new_for_bytes('image/png', GLib.Bytes.new(png.getvalue())),
         ]))
-        self.status.set_label('Copied as SVG')
+        self.show_toast('Copied')
+
+    def show_toast(self, text):
+        self.toast.set_label(text)
+        self.toast_revealer.set_reveal_child(True)
+        if self.toast_timeout:
+            GLib.source_remove(self.toast_timeout)
+        self.toast_timeout = GLib.timeout_add(TOAST_MS, self.hide_toast)
+
+    def hide_toast(self):
+        self.toast_revealer.set_reveal_child(False)
+        self.toast_timeout = None
+        return GLib.SOURCE_REMOVE
 
     def save(self):
         filters = Gio.ListStore.new(Gtk.FileFilter)
