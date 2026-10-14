@@ -76,6 +76,10 @@ class ForPresentingDrawings:
         the keys & é " ' ( - è _ ç of a French keyboard in that order. Other indexes are left alone."""
         raise NotImplementedError
 
+    def colors(self) -> tuple[PenColor, ...]:
+        """The palette, in the order set_color takes."""
+        raise NotImplementedError
+
     def pick_eraser(self) -> None:
         """Make the pen erase, until a color is picked: every stroke or shape it touches goes away whole."""
         raise NotImplementedError

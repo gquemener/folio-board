@@ -18,8 +18,9 @@ def colors(app):
     return [s[5] for s in app.page().segments]
 
 
-def test_the_palette_has_nine_colors_in_key_order():
-    assert [name for name, _ in palette.COLORS] == NAMES
+def test_the_palette_has_nine_colors_in_key_order(world):
+    assert [color.name for color in world.app.colors()] == NAMES
+    assert world.app.colors()[1] == PenColor('Orange', palette.rgb(0xF57C00))
 
 
 def test_black_is_picked_at_first(world):

@@ -74,8 +74,8 @@ press the pad's button at any time.
 | Portrait / landscape        | Portrait, Landscape             | `r`        |
 | Pressure on/off             | Pressure                        | `p`        |
 | Shapes on/off               | Shapes                          | `o`        |
-| Pen color                   |                                 | `&` to `ç` |
-| Eraser                      |                                 | `à`        |
+| Pen color                   | palette in the header           | `&` to `ç` |
+| Eraser                      | ◯ at the end of the palette     | `à`        |
 | Save as PNG or SVG          | Save                            | `Ctrl+S`   |
 | Copy as SVG                 | Copy                            | `Ctrl+C`   |
 | Pick area to save or copy   | drag with the mouse on the page |            |
@@ -129,9 +129,10 @@ draw the next strokes in another color:
 | `é` | Orange | `(` | Yellow | `_` | Pink  |
 | `"` | Blue   | `-` | Red    | `ç` | Brown |
 
-The window briefly names the color you picked, and the header shows the
-current one. Each session starts in black, and strokes keep the color they
-were drawn in.
+The middle of the header shows the whole palette, then the eraser, with the
+one in use framed in blue; clicking one picks it too, and hovering it shows its
+key. The window briefly names the color you picked. Each session starts in
+black, and strokes keep the color they were drawn in.
 
 `à`, the next key, picks the **eraser**: the pen then draws nothing, and every
 stroke or shape it touches, within 2.5 mm, goes away whole. The red dot turns

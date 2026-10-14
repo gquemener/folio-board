@@ -11,7 +11,8 @@ from folio_board.hexagon.driven.for_remembering_the_drawing import ForRememberin
 from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings
 from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
 from folio_board.hexagon.driven.for_telling_time import ForTellingTime
-from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, ForPresentingDrawings, Page, Settings
+from folio_board.hexagon.driver.for_presenting_drawings import (UNIT_UM, ForPresentingDrawings, Page, PenColor,
+                                                                 Settings)
 from folio_board.hexagon.driver.for_receiving_pen_input import ForReceivingPenInput
 
 # The pad link tries to reach the pad for ~25 s per start, then gives up: start again after this.
@@ -111,6 +112,9 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
             self.board.erasing = False
             self.presenter.toast(palette.COLORS[color][0])
             self.presenter.page_changed()
+
+    def colors(self):
+        return tuple(PenColor(name, palette.rgb(value)) for name, value in palette.COLORS)
 
     def pick_eraser(self):
         self.board.erasing = True

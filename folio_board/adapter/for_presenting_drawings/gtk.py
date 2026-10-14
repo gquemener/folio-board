@@ -11,7 +11,7 @@ import gi
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
-from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
 import cairo  # noqa: E402
 
@@ -24,10 +24,11 @@ MIN_CROP_PIXELS = 8
 TOAST_MS = 1500
 # The top row of a French AZERTY keyboard, without Shift, picks the palette's colors in order:
 # & é " ' ( - è _ ç. The next key, à, picks the eraser.
-COLOR_KEYS = {key: color for color, key in enumerate((
-    Gdk.KEY_ampersand, Gdk.KEY_eacute, Gdk.KEY_quotedbl, Gdk.KEY_apostrophe, Gdk.KEY_parenleft,
-    Gdk.KEY_minus, Gdk.KEY_egrave, Gdk.KEY_underscore, Gdk.KEY_ccedilla))}
-TOAST_CSS = '.toast { background: rgba(0, 0, 0, 0.75); color: white; border-radius: 99px; padding: 8px 20px; }'
+COLOR_KEY_NAMES = ('&', 'é', '"', "'", '(', '-', 'è', '_', 'ç')
+COLOR_KEYS = {Gdk.unicode_to_keyval(ord(name)): color for color, name in enumerate(COLOR_KEY_NAMES)}
+CSS = ('.toast { background: rgba(0, 0, 0, 0.75); color: white; border-radius: 99px; padding: 8px 20px; }'
+       '.tool { padding: 2px 5px; min-width: 0; }'
+       '.tool:checked { box-shadow: inset 0 0 0 2px #3584e4; background: rgba(53, 132, 228, 0.15); }')
 
 
 def pictures_dir():
@@ -50,7 +51,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
                                            halign=Gtk.Align.CENTER, valign=Gtk.Align.END, margin_bottom=32)
         self.toast_timeout = None
         css = Gtk.CssProvider()
-        css.load_from_string(TOAST_CSS)
+        css.load_from_string(CSS)
         Gtk.StyleContext.add_provider_for_display(self.get_display(), css,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         overlay = Gtk.Overlay(child=self.area)
@@ -87,10 +88,10 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
                                       tooltip_text='Replace hand-drawn boxes, circles and arrows with clean ones')
         self.shapes.connect('toggled', lambda b: board.set_shapes(b.get_active()))
         header.pack_end(self.shapes)
-        self.status_label = Gtk.Label(label='Starting…')
+        # Shortened with an ellipsis when the window is narrow; its tooltip shows it whole.
+        self.status_label = Gtk.Label(label='Starting…', ellipsize=Pango.EllipsizeMode.END, width_chars=10)
         header.pack_end(self.status_label)
-        self.pen_label = Gtk.Label(tooltip_text='Pen color: keys & é " \' ( - è _ ç; eraser: à')
-        header.pack_end(self.pen_label)
+        header.set_title_widget(self.make_palette())
         self.show_pen_color()
         self.set_titlebar(header)
 
@@ -120,6 +121,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
 
     def status(self, text):
         self.status_label.set_label(text)
+        self.status_label.set_tooltip_text(text)
 
     def toast(self, text):
         self.toast_label.set_label(text)
@@ -146,11 +148,9 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         elif keyval == Gdk.KEY_p:
             self.pressure.set_active(not self.pressure.get_active())
         elif keyval in COLOR_KEYS:
-            self.board.set_color(COLOR_KEYS[keyval])
-            self.show_pen_color()
+            self.pick(COLOR_KEYS[keyval])
         elif keyval == Gdk.KEY_agrave:
-            self.board.pick_eraser()
-            self.show_pen_color()
+            self.pick(None)
         elif keyval == Gdk.KEY_o:
             self.shapes.set_active(not self.shapes.get_active())
         elif keyval == Gdk.KEY_s and ctrl:
@@ -207,13 +207,41 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
 
     # Showing the page
 
+    def make_palette(self):
+        """A button per color, then the eraser; the one in use is pressed."""
+        self.tools = []
+        self.showing_tool = False
+        palette = Gtk.Box(css_classes=['linked'])
+        for color, (pen, key) in enumerate(zip(self.board.colors(), COLOR_KEY_NAMES)):
+            hex_color = '#' + ''.join(f'{round(c * 255):02x}' for c in pen.color)
+            swatch = Gtk.Label(use_markup=True, label=f'<span foreground="{hex_color}" size="large">⬤</span>')
+            self.add_tool(palette, swatch, f'{pen.name} ({key})', color)
+        self.add_tool(palette, Gtk.Label(label='◯'), 'Eraser (à): takes away whole strokes and shapes', None)
+        return palette
+
+    def add_tool(self, palette, child, tooltip, color):
+        group = self.tools[0][0] if self.tools else None
+        button = Gtk.ToggleButton(child=child, tooltip_text=tooltip, group=group, css_classes=['tool'])
+        button.connect('toggled', lambda b: b.get_active() and not self.showing_tool and self.pick(color))
+        palette.append(button)
+        self.tools.append((button, color))
+
+    def pick(self, color):
+        """Pick a color by its index in the palette, or the eraser for None."""
+        if color is None:
+            self.board.pick_eraser()
+        else:
+            self.board.set_color(color)
+        self.show_pen_color()
+
     def show_pen_color(self):
         page = self.board.page()
-        if page.eraser is not None:
-            self.pen_label.set_markup('◯ Eraser')
-            return
-        hex_color = '#' + ''.join(f'{round(c * 255):02x}' for c in page.pen.color)
-        self.pen_label.set_markup(f'<span foreground="{hex_color}">⬤</span> {GLib.markup_escape_text(page.pen.name)}')
+        active = None if page.eraser is not None else self.board.colors().index(page.pen)
+        self.showing_tool = True  # pressing the button would pick the tool again
+        for button, color in self.tools:
+            if color == active:
+                button.set_active(True)
+        self.showing_tool = False
 
     def hide_toast(self):
         self.toast_revealer.set_reveal_child(False)
