@@ -1,13 +1,14 @@
-"""The palette strip along the pad's top edge: tapping a box picks the color of the next strokes."""
+"""The palette strip, 15 mm below the pad's top edge: tapping a box picks the color of the next strokes."""
 import pytest
 
 from folio_board.hexagon import palette
 
-# The A5 test pad is 14800 units wide in portrait: 16 boxes of 925 units, 1500 units (15 mm) high.
+# The A5 test pad is 14800 units wide in portrait: 16 boxes of 925 units, 1500 units (15 mm) high,
+# from 15 mm to 30 mm below the top edge.
 BOX = 925
 
 
-def tap(app, portrait_x, portrait_y=700):
+def tap(app, portrait_x, portrait_y=2200):
     """Tap the pen at a point given as seen in portrait: pad x is portrait y, pad y is 14800 - portrait x."""
     app.pen(True, portrait_y, 14800 - portrait_x, 800)
     app.pen(True, portrait_y, 14800 - portrait_x, 0)
@@ -45,7 +46,7 @@ def test_tapping_draws_nothing(world):
 
 
 def test_sliding_off_the_strip_draws_nothing_until_the_pen_lifts(world):
-    world.app.pen(True, 700, 5000, 800)
+    world.app.pen(True, 2200, 5000, 800)
     world.app.pen(True, 4000, 5000, 800)
     world.app.pen(True, 6000, 5000, 800)
     assert world.app.page().segments == ()
@@ -55,7 +56,7 @@ def test_sliding_off_the_strip_draws_nothing_until_the_pen_lifts(world):
 
 
 def test_leaving_range_ends_the_tap(world):
-    world.app.pen(True, 700, 5000, 800)
+    world.app.pen(True, 2200, 5000, 800)
     world.app.pen(False, 0, 0, 0)
     stroke(world.app, (7000, 5000))
     assert len(world.app.page().segments) == 1
@@ -70,18 +71,22 @@ def test_strokes_keep_their_color(world):
 
 
 def test_a_stroke_may_run_into_the_strip(world):
-    stroke(world.app, (2000, 5000), (500, 5000), (300, 7000))
+    stroke(world.app, (4000, 5000), (2200, 5000), (300, 7000))
     assert len(world.app.page().segments) == 3
     assert world.presenter.toasts == []
 
 
-def test_the_strip_is_15_mm_high(world):
-    world.app.pen(True, 1499, 5000, 800)    # 14.99 mm from the top edge: on the strip
-    world.app.pen(True, 1499, 5000, 0)
-    world.app.pen(True, 1500, 5000, 800)    # 15 mm: on the page
-    world.app.pen(True, 1500, 5000, 0)
-    assert len(world.app.page().segments) == 1
-    assert len(world.presenter.toasts) == 1
+@pytest.mark.parametrize('mm_from_top, on_strip', [
+    (14.99, False),
+    (15, True),
+    (29.99, True),
+    (30, False),
+])
+def test_the_strip_runs_from_15_to_30_mm_below_the_top_edge(world, mm_from_top, on_strip):
+    world.app.pen(True, round(mm_from_top * 100), 5000, 800)
+    world.app.pen(True, round(mm_from_top * 100), 5000, 0)
+    assert len(world.presenter.toasts) == on_strip
+    assert len(world.app.page().segments) == (not on_strip)
 
 
 def test_boxes_cover_the_whole_width(world):
@@ -90,19 +95,19 @@ def test_boxes_cover_the_whole_width(world):
     assert world.presenter.toasts == ['Black', 'White']
 
 
-def test_swatches_lie_along_the_top_in_portrait(world):
+def test_swatches_lie_near_the_top_in_portrait(world):
     swatches = world.app.page().palette
     assert [s.name for s in swatches] == [name for name, _ in palette.COLORS]
-    assert swatches[0].rect == (0, 0, BOX, 1500)
-    assert swatches[15].rect == (15 * BOX, 0, 14800, 1500)
+    assert swatches[0].rect == (0, 1500, BOX, 3000)
+    assert swatches[15].rect == (15 * BOX, 1500, 14800, 3000)
 
 
 def test_the_strip_stays_on_the_pads_top_edge_in_landscape(world):
     world.app.set_orientation('landscape')
     swatches = world.app.page().palette
-    # Black, top left in portrait, goes to the top of the right edge.
-    assert (swatches[0].rect, swatches[15].rect) == ((21000 - 1500, 0, 21000, BOX),
-                                                     (21000 - 1500, 14800 - BOX, 21000, 14800))
+    # Black, top left in portrait, goes to the top, near the right edge.
+    assert (swatches[0].rect, swatches[15].rect) == ((21000 - 3000, 0, 21000 - 1500, BOX),
+                                                     (21000 - 3000, 14800 - BOX, 21000 - 1500, 14800))
 
 
 def test_picking_survives_clearing(world):

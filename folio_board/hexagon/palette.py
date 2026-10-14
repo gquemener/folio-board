@@ -1,6 +1,7 @@
 """The colors of the palette strip: the 16 CGA / EGA colors of 8-bit era PCs."""
 
-# 15 mm along the top edge of the pad, in the default portrait orientation.
+# A band 15 mm high, 15 mm below the top edge of the pad, in the default portrait orientation.
+STRIP_TOP_MM = 15
 STRIP_MM = 15
 
 COLORS = [

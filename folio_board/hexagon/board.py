@@ -10,7 +10,8 @@ PEN_MIN_WIDTH_MM = 0.2
 PEN_MAX_WIDTH_MM = 2.4
 # Stroke width on paper when pressure sensitivity is off.
 PEN_FIXED_WIDTH_MM = 0.8
-STRIP_UNITS = palette.STRIP_MM * 1000 // UNIT_UM
+STRIP_TOP_UNITS = palette.STRIP_TOP_MM * 1000 // UNIT_UM
+STRIP_BOTTOM_UNITS = STRIP_TOP_UNITS + palette.STRIP_MM * 1000 // UNIT_UM
 
 
 class Board:
@@ -71,7 +72,7 @@ class Board:
     def swatch_at(self, x, y):
         """Index of the palette color under pad point (x, y), or None off the strip."""
         px, py = self.to_portrait(x, y)
-        if not (0 <= py < STRIP_UNITS and 0 <= px <= self.pad_h):
+        if not (STRIP_TOP_UNITS <= py < STRIP_BOTTOM_UNITS and 0 <= px <= self.pad_h):
             return None
         return min(int(px * len(palette.COLORS) // self.pad_h), len(palette.COLORS) - 1)
 
@@ -81,7 +82,8 @@ class Board:
         swatches = []
         for i, (name, value) in enumerate(palette.COLORS):
             # Box i spans portrait x from i/n to (i+1)/n of the strip: pad y counts the other way.
-            (ax, ay), (bx, by) = self.to_view(0, self.pad_h * (n - i) / n), self.to_view(STRIP_UNITS, self.pad_h * (n - i - 1) / n)
+            (ax, ay) = self.to_view(STRIP_TOP_UNITS, self.pad_h * (n - i) / n)
+            (bx, by) = self.to_view(STRIP_BOTTOM_UNITS, self.pad_h * (n - i - 1) / n)
             rect = (min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))
             swatches.append(Swatch(rect, palette.rgb(value), name, i == self.color))
         return tuple(swatches)

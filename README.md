@@ -89,16 +89,16 @@ Uncheck it to draw every stroke at the same width.
 
 ### Colors
 
-The top 15 mm of the pad (in portrait) is a palette strip with the 16 CGA / EGA
-colors of 8-bit era PCs, black on the left to white on the right. Tap a box
+A 15 mm band of the pad, starting 15 mm below its top edge (in portrait), is a
+palette strip with the 16 CGA / EGA colors of 8-bit era PCs, black on the left to white on the right. Tap a box
 with the pen to draw the next strokes in its color. A tap is never drawn, even
 if the pen slides off the strip before lifting. The window shows the strip with
 the current color framed, and briefly names the color you picked.
 
-Mark the boxes on the paper (or keep a printed strip at the top edge) so you
-can find them without looking at the screen. Each box is 1/16 of the pad's
-width, 13.5 mm on an A4 Folio. The strip stays on the pad's top edge, which
-is on the right in landscape, and it is left out of saved and copied images.
+Mark the boxes on the paper (or keep a printed strip there) so you can find
+them without looking at the screen. Each box is 1/16 of the pad's width,
+13.5 mm on an A4 Folio. The strip stays near the pad's top edge, which is on
+the right in landscape, and it is left out of saved and copied images.
 
 The red dot shows where the pen hovers, so viewers can follow it before it
 touches the paper.

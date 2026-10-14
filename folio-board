@@ -4,7 +4,7 @@
 Usage: folio-board [BLUETOOTH_ADDRESS]
 Keys: c clear, r portrait / landscape, p pressure on/off, Ctrl+S save, Ctrl+C copy as SVG,
 q / Esc quit. Drag with the mouse to pick the area to save or copy; click outside it
-to use the whole page again. Tap the strip along the pad's top edge to change color.
+to use the whole page again. Tap the strip 15 mm below the pad's top edge to change color.
 
 The code lives in the folio_board package next to this file, even when it is run through a symlink.
 """

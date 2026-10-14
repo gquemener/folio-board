@@ -41,8 +41,8 @@ def test_each_stroke_is_kept_when_the_pen_lifts(world):
 
 
 def test_picking_a_color_keeps_nothing(world):
-    world.app.pen(True, 100, 7000, 1000)
-    world.app.pen(True, 100, 7000, 0)
+    world.app.pen(True, 2000, 7000, 1000)
+    world.app.pen(True, 2000, 7000, 0)
     assert world.memory.remembered == 0
 
 
