@@ -43,8 +43,6 @@ def test_lifting_the_pen_starts_a_new_stroke(world):
     draw(world.app, (3100, 100), (3200, 200))
     draw(world.app, (3500, 500))
     assert len(world.app.page().segments) == 3
-    world.app.undo()
-    assert len(world.app.page().segments) == 2
     world.app.clear()
     assert world.app.page().segments == ()
 

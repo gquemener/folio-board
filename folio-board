@@ -2,7 +2,7 @@
 """Mirror what you draw on a Wacom SmartPad into a window, live.
 
 Usage: folio-board [BLUETOOTH_ADDRESS]
-Keys: c clear, Ctrl+Z undo, r rotate, p pressure on/off, Ctrl+S save, Ctrl+C copy as SVG,
+Keys: c clear, r rotate, p pressure on/off, Ctrl+S save, Ctrl+C copy as SVG,
 q / Esc quit. Drag with the mouse to pick the area to save or copy; click outside it
 to use the whole page again. Tap the strip along the pad's top edge to change color.
 

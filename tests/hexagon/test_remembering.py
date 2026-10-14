@@ -46,11 +46,8 @@ def test_picking_a_color_keeps_nothing(world):
     assert world.memory.remembered == 0
 
 
-def test_undo_and_clear_are_kept(world):
+def test_clear_is_kept(world):
     draw(world.app, (3100, 200))
-    draw(world.app, (3500, 500))
-    world.app.undo()
-    assert len(world.memory.strokes) == 1
     world.app.clear()
     assert world.memory.strokes == []
 

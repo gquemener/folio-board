@@ -95,11 +95,6 @@ class Board:
         self.strokes.clear()
         self.current = None
 
-    def undo(self):
-        if self.strokes:
-            self.strokes.pop()
-            self.current = None
-
     def rotate(self):
         i = ORIENTATIONS.index(self.orientation)
         self.orientation = ORIENTATIONS[(i + 1) % len(ORIENTATIONS)]

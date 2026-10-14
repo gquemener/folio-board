@@ -71,7 +71,6 @@ press the pad's button at any time.
 | Action             | Button    | Key        |
 | ------------------ | --------- | ---------- |
 | Clear the page (asks first) | Clear | `c`      |
-| Undo last stroke   | Undo      | `Ctrl+Z`   |
 | Rotate the page    | Rotate    | `r`        |
 | Pressure on/off    | Pressure  | `p`        |
 | Save as PNG or SVG | Save      | `Ctrl+S`   |
@@ -81,9 +80,9 @@ press the pad's button at any time.
 | Quit               |           | `q`, `Esc` |
 
 The drawing is kept between sessions: close the window, and the next
-`folio-board` shows the page as you left it, strokes and undo history included.
-It stays until you clear it. **Clear** asks for confirmation first, since a
-cleared drawing cannot be brought back.
+`folio-board` shows the page as you left it. It stays until you clear it.
+**Clear** asks for confirmation first, since a cleared drawing cannot be
+brought back.
 
 With **Pressure** checked (the default), pressing harder draws a thicker line.
 Uncheck it to draw every stroke at the same width.

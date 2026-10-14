@@ -53,7 +53,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         self.set_child(overlay)
 
         header = Gtk.HeaderBar()
-        for label, handler in (('Clear', self.confirm_clear), ('Undo', board.undo), ('Rotate', board.rotate),
+        for label, handler in (('Clear', self.confirm_clear), ('Rotate', board.rotate),
                                ('Reconnect', board.reconnect)):
             button = Gtk.Button(label=label)
             button.connect('clicked', lambda _b, h=handler: h())
@@ -118,8 +118,6 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
             self.board.rotate()
         elif keyval == Gdk.KEY_p:
             self.pressure.set_active(not self.pressure.get_active())
-        elif keyval == Gdk.KEY_z and ctrl:
-            self.board.undo()
         elif keyval == Gdk.KEY_s and ctrl:
             self.save()
         return True

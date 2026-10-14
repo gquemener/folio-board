@@ -52,10 +52,6 @@ class ForPresentingDrawings:
         """Remove every stroke, from the drawing kept between sessions too."""
         raise NotImplementedError
 
-    def undo(self) -> None:
-        """Remove the last stroke."""
-        raise NotImplementedError
-
     def rotate(self) -> None:
         """Turn the page a quarter turn; this drops the crop."""
         raise NotImplementedError

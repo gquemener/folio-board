@@ -76,11 +76,6 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         self._remember()
         self.presenter.page_changed()
 
-    def undo(self):
-        self.board.undo()
-        self._remember()
-        self.presenter.page_changed()
-
     def rotate(self):
         self.board.rotate()
         self.presenter.page_changed()

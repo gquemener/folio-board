@@ -67,8 +67,6 @@ def test_strokes_keep_their_color(world):
     tap(world.app, 1 * BOX + 10)                # blue
     stroke(world.app, (8000, 8000))
     assert colors(world.app) == [palette.rgb(0xAA0000), palette.rgb(0x0000AA)]
-    world.app.undo()
-    assert colors(world.app) == [palette.rgb(0xAA0000)]
 
 
 def test_a_stroke_may_run_into_the_strip(world):
