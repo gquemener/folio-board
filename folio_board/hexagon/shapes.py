@@ -1,8 +1,8 @@
-"""Hand-drawn boxes and arrows, recognized and redrawn in a sketchy mockup style.
+"""Hand-drawn boxes, circles and arrows, recognized and redrawn in a sketchy mockup style.
 
 Strokes drawn one right after another, in the same color, form a group; when a group
-looks like a box, or like an arrow (a shaft, then a head of one or two strokes), it is
-replaced by that shape. All lengths are in pad units, as strokes are.
+looks like a box, an ellipse, or an arrow (a shaft, then a head of one or two strokes),
+it is replaced by that shape. All lengths are in pad units, as strokes are.
 
 The thresholds were tuned on tests/fixtures/shape_samples.json, drawn on a Bamboo Folio.
 """
@@ -11,7 +11,7 @@ import random
 import statistics
 from typing import Optional, Union
 
-from folio_board.hexagon.driven.for_remembering_the_drawing import Arrow, Box, Stroke
+from folio_board.hexagon.driven.for_remembering_the_drawing import Arrow, Box, Ellipse, Stroke
 from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM
 
 MM = 1000 / UNIT_UM
@@ -30,6 +30,16 @@ BOX_MIN_MM = 8
 # by up to twice as much.
 BOX_TOLERANCE = 0.15
 
+# An ellipse's smaller diameter is at least this long, as for boxes.
+ELLIPSE_MIN_MM = 8
+# How far, relative to its radius, the drawing may stray from the ellipse: most of it, and all of it.
+# Boxes stray 0.25 or more at their corners.
+ELLIPSE_TOLERANCE = (0.12, 0.25)
+# How much of the turn around the center the drawing must cover, so that a U or an arc stays as drawn.
+ELLIPSE_TURN = 0.9
+# An ellipse whose radii differ by less than this, relative to the larger one, becomes a circle.
+CIRCLE_ROUNDNESS = 0.2
+
 ARROW_MIN_MM = 15
 # How far the shaft may stray from a smooth curve, relative to its length.
 SHAFT_TOLERANCE = 0.06
@@ -45,7 +55,7 @@ HEAD_GAP_MM = 3
 STRAIGHT_BEND = 0.05
 SNAP_DEGREES = 5
 
-Shape = Union[Box, Arrow]
+Shape = Union[Box, Ellipse, Arrow]
 
 
 class Grouper:
@@ -77,7 +87,7 @@ class Grouper:
 
 
 def recognize(strokes: list[Stroke]) -> Optional[Shape]:
-    return box(strokes) or (arrow(strokes[0], strokes[1:]) if 2 <= len(strokes) <= 3 else None)
+    return box(strokes) or ellipse(strokes) or (arrow(strokes[0], strokes[1:]) if 2 <= len(strokes) <= 3 else None)
 
 
 # Boxes
@@ -129,6 +139,31 @@ def outline(rect, n):
     x0, y0, x1, y1 = rect
     corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]
     return polyline_points(corners, n)
+
+
+# Ellipses
+
+def ellipse(strokes: list[Stroke]) -> Optional[Ellipse]:
+    points = resample([p for s in strokes for p in s.points], MM / 2)
+    if len(points) < 16:
+        return None
+    # The extent of the points, leaving out the 2% furthest on each side, such as where the pen
+    # ran past its starting point.
+    xs, ys = sorted(p[0] for p in points), sorted(p[1] for p in points)
+    n, k = len(points), len(points) // 50
+    x0, x1, y0, y1 = xs[k], xs[n - 1 - k], ys[k], ys[n - 1 - k]
+    cx, cy, rx, ry = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2
+    if 2 * min(rx, ry) < ELLIPSE_MIN_MM * MM:
+        return None
+    strays = sorted(abs(math.hypot((x - cx) / rx, (y - cy) / ry) - 1) for x, y in points)
+    if strays[int(0.9 * n)] > ELLIPSE_TOLERANCE[0] or strays[-1] > ELLIPSE_TOLERANCE[1]:
+        return None
+    turn = {int(math.degrees(math.atan2((y - cy) / ry, (x - cx) / rx)) % 360 // 10) for x, y in points}
+    if len(turn) < ELLIPSE_TURN * 36:
+        return None
+    if abs(rx - ry) <= CIRCLE_ROUNDNESS * max(rx, ry):
+        rx = ry = (rx + ry) / 2
+    return Ellipse(strokes[0].color, mean_pressure(strokes), (cx, cy), (rx, ry), list(strokes))
 
 
 # Arrows
@@ -219,6 +254,8 @@ def sketch(shape: Shape) -> list[list[tuple[float, float]]]:
         x0, y0, x1, y1 = shape.rect
         corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
         return [line for a, b in zip(corners, corners[1:] + corners[:1]) for line in rough_line(a, b, rng)]
+    if isinstance(shape, Ellipse):
+        return rough_ellipse(shape.center, shape.radii, random.Random(seed(shape.center + shape.radii)))
     rng = random.Random(seed(shape.tail + shape.tip))
     lines = rough_curve(shape.tail, shape.control, shape.tip, rng)
     back = (shape.control[0] - shape.tip[0], shape.control[1] - shape.tip[1])
@@ -264,6 +301,25 @@ def rough_line(a, b, rng):
         bow = rng.uniform(-1, 1) * min(0.012 * length, 1.5 * MM)
         control = ((s[0] + e[0]) / 2 - uy * bow * 2, (s[1] + e[1]) / 2 + ux * bow * 2)
         lines.append(quadratic(s, control, e, max(4, int(length / (SEGMENT_MM * MM)))))
+    return lines
+
+
+def rough_ellipse(center, radii, rng):
+    """Two passes round the ellipse, each slightly off and wavy, starting anywhere and overlapping a little."""
+    (cx, cy), (rx, ry) = center, radii
+    perimeter = math.pi * (rx + ry)
+    lines = []
+    for _ in range(2):
+        start, overlap = rng.uniform(0, 2 * math.pi), math.radians(rng.uniform(10, 25))
+        wave, phase = rng.uniform(0.01, 0.025), rng.uniform(0, 2 * math.pi)
+        shift = (rng.uniform(-0.01, 0.01) * rx, rng.uniform(-0.01, 0.01) * ry)
+        n = max(24, int(perimeter / (SEGMENT_MM * MM)))
+        line = []
+        for k in range(n + 1):
+            t = start + (2 * math.pi + overlap) * k / n
+            r = 1 + wave * math.sin(2 * t + phase)
+            line.append((cx + shift[0] + rx * r * math.cos(t), cy + shift[1] + ry * r * math.sin(t)))
+        lines.append(line)
     return lines
 
 

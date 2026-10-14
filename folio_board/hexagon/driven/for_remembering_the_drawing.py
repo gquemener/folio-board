@@ -21,6 +21,16 @@ class Box:
 
 
 @dataclass
+class Ellipse:
+    """An ellipse that replaced hand-drawn strokes, upright on the pad; a circle when both radii are equal."""
+    color: int
+    pressure: float
+    center: Point
+    radii: Point  # along pad x and pad y
+    strokes: list[Stroke]
+
+
+@dataclass
 class Arrow:
     """An arrow that replaced hand-drawn strokes: a quadratic curve, straight when control is its middle."""
     color: int
@@ -31,7 +41,7 @@ class Arrow:
     strokes: list[Stroke]
 
 
-Item = Union[Stroke, Box, Arrow]
+Item = Union[Stroke, Box, Ellipse, Arrow]
 
 
 class RememberingError(Exception):

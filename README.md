@@ -93,8 +93,8 @@ sessions too, and clearing the drawing leaves them as they are.
 
 ### Shapes
 
-With **Shapes** checked (the default), boxes and arrows you draw by hand are
-replaced by clean ones, with a slightly sketchy, mockup-like look. They keep
+With **Shapes** checked (the default), boxes, circles and arrows you draw by
+hand are replaced by clean ones, with a slightly sketchy, mockup-like look. They keep
 the color you drew them in, and their line width follows the **Pressure**
 setting, like strokes do. Uncheck **Shapes** when you want to draw freely:
 what you draw from then on stays as drawn, and shapes already on the page stay.
@@ -102,6 +102,11 @@ what you draw from then on stays as drawn, and shapes already on the page stay.
 - **Boxes** can be drawn in one stroke or in up to four (a side or an L at a
   time). They come out upright, so a box tilted more than about 15° stays as
   drawn, and the shorter side must be at least 8 mm, so handwriting never snaps.
+- **Circles** and ellipses, usually drawn in one stroke, must go almost all the
+  way round, so a U or an arc stays as drawn. One that is nearly round, its
+  width and height within 20% of each other, becomes a perfect circle; a
+  flatter one stays an upright ellipse. Like boxes, they are at least 8 mm
+  across.
 - **Arrows** are a shaft followed by a head, drawn as a V or as two strokes.
   A curved shaft gives a curved arrow; a nearly straight one gives a straight
   arrow, turned to the nearest horizontal, vertical or diagonal when close.
@@ -208,8 +213,8 @@ display. `tests/adapter` covers UHID decoding, image encoding, storage, and the
 kept drawing and settings, and `tests/test_hexagon_isolation.py` checks that
 the hexagon imports nothing from the outside world.
 
-`tests/fixtures/shape_samples.json` holds boxes, arrows, handwriting and
-doodles drawn on a Bamboo Folio. Shape recognition is tested, and its
+`tests/fixtures/shape_samples.json` holds boxes, arrows, a circle, handwriting
+and doodles drawn on a Bamboo Folio. Shape recognition is tested, and its
 thresholds were tuned, on these strokes: when a shape you draw is missed, or
 something snaps that should not, adding it there makes a test case.
 

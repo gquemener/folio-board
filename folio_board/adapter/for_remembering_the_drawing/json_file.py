@@ -2,7 +2,7 @@
 import json
 import os
 
-from folio_board.hexagon.driven.for_remembering_the_drawing import (Arrow, Box, ForRememberingTheDrawing,
+from folio_board.hexagon.driven.for_remembering_the_drawing import (Arrow, Box, Ellipse, ForRememberingTheDrawing,
                                                                     RememberingError, Stroke)
 
 VERSION = 2
@@ -46,6 +46,9 @@ def encode(item):
              'strokes': [encode_stroke(s) for s in item.strokes]}
     if isinstance(item, Box):
         return {'type': 'box', 'rect': [round(n) for n in item.rect], **shape}
+    if isinstance(item, Ellipse):
+        return {'type': 'ellipse', 'center': [round(n) for n in item.center],
+                'radii': [round(n) for n in item.radii], **shape}
     return {'type': 'arrow', 'tail': [round(n) for n in item.tail], 'control': [round(n) for n in item.control],
             'tip': [round(n) for n in item.tip], **shape}
 
@@ -61,6 +64,8 @@ def decode(data):
     strokes = [decode_stroke(s) for s in data['strokes']]
     if kind == 'box':
         return Box(data['color'], data['pressure'], tuple(data['rect']), strokes)
+    if kind == 'ellipse':
+        return Ellipse(data['color'], data['pressure'], tuple(data['center']), tuple(data['radii']), strokes)
     if kind == 'arrow':
         return Arrow(data['color'], data['pressure'], tuple(data['tail']), tuple(data['control']),
                      tuple(data['tip']), strokes)

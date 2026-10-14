@@ -1,13 +1,14 @@
-"""Hand-drawn boxes and arrows become clean, sketchy ones; the rest stays as drawn.
+"""Hand-drawn boxes, circles and arrows become clean, sketchy ones; the rest stays as drawn.
 
 The samples were drawn on a Bamboo Folio, area by area, on a guide page: see SAMPLE_AREAS.
 """
 import json
+import math
 import pathlib
 
 import pytest
 
-from folio_board.hexagon.driven.for_remembering_the_drawing import Arrow, Box, Stroke
+from folio_board.hexagon.driven.for_remembering_the_drawing import Arrow, Box, Ellipse, Stroke
 from tests.hexagon.conftest import A5_UM
 
 SAMPLES = json.loads((pathlib.Path(__file__).parent.parent / 'fixtures' / 'shape_samples.json').read_text())['items']
@@ -25,9 +26,10 @@ SAMPLE_AREAS = {
     'arrow to the left': [22, 23],
     'arrow up': [24, 25],
     'arrow down and right': [26, 27],
+    'circle': [46],
 }
 HANDWRITING = list(range(28, 43))  # "Login OK Cancel"
-DOODLES = [43, 44, 45, 46, 47]  # U, L, line, circle, tilted box
+DOODLES = [43, 44, 45, 47]  # U, L, line, tilted box
 PAUSE = 0.4
 
 
@@ -41,6 +43,21 @@ def replay(world, indexes, pause=PAUSE, color_between=None):
             world.clock.advance(0.004)
         world.app.pen(True, x, y, 0)
         world.clock.advance(pause)
+
+
+def draw(world, points, pressure=0.4):
+    for x, y in points:
+        world.app.pen(True, round(x), round(y), round(pressure * 2047))
+        world.clock.advance(0.004)
+    world.app.pen(True, round(x), round(y), 0)
+    world.clock.advance(PAUSE)
+
+
+def ellipse_points(rx, ry, turn=1.1, center=(15000, 10000)):
+    """A hand-drawn-like ellipse, slightly wavy, going round turn times, radii in mm."""
+    return [(center[0] + rx * 100 * (1 + 0.03 * math.sin(3 * t)) * math.cos(t),
+             center[1] + ry * 100 * (1 + 0.03 * math.sin(3 * t)) * math.sin(t))
+            for t in (2 * math.pi * turn * k / 400 for k in range(401))]
 
 
 def tap_color(world, index):
@@ -63,7 +80,7 @@ def world(world):
 @pytest.mark.parametrize('area', SAMPLE_AREAS)
 def test_each_sample_snaps_to_its_shape(world, area):
     replay(world, SAMPLE_AREAS[area])
-    kind = Box if 'box' in area else Arrow
+    kind = Box if 'box' in area else Ellipse if area == 'circle' else Arrow
     assert [type(s) for s in shapes(world)] == [kind]
     # The shape keeps the strokes as drawn.
     assert [[p[:2] for p in s.points] for s in shapes(world)[0].strokes] == [
@@ -72,9 +89,9 @@ def test_each_sample_snaps_to_its_shape(world, area):
 
 def test_the_whole_page_snaps_boxes_and_arrows_only(world):
     replay(world, range(len(SAMPLES)))
-    assert [type(s).__name__ for s in shapes(world)] == ['Box'] * 7 + ['Arrow'] * 5
+    assert [type(s).__name__ for s in shapes(world)] == ['Box'] * 7 + ['Arrow'] * 5 + ['Ellipse']
     snapped = sum(len(v) for v in SAMPLE_AREAS.values())
-    assert len(world.memory.items) == len(SAMPLES) - snapped + 12
+    assert len(world.memory.items) == len(SAMPLES) - snapped + 13
 
 
 @pytest.mark.parametrize('indexes', [HANDWRITING, DOODLES], ids=['handwriting', 'doodles'])
@@ -91,6 +108,29 @@ def test_a_box_takes_the_place_of_its_strokes(world):
     assert (x1 - x0, y1 - y0) == pytest.approx((3350, 4180), abs=100)  # about 33 x 42 mm
     assert box.color == 0
     assert 0 < box.pressure < 1
+
+
+def test_a_nearly_round_ellipse_becomes_a_circle(world):
+    replay(world, SAMPLE_AREAS['circle'])  # drawn about 17 x 20 mm
+    circle = shapes(world)[0]
+    assert circle.radii[0] == circle.radii[1] == pytest.approx(913, abs=50)
+
+
+def test_a_wide_ellipse_stays_an_ellipse(world):
+    draw(world, ellipse_points(30, 12))
+    (rx, ry), = [s.radii for s in shapes(world)]
+    assert (rx, ry) == pytest.approx((3000, 1200), rel=0.05)
+
+
+@pytest.mark.parametrize('turn', [0.5, 0.75])
+def test_an_arc_stays_as_drawn(world, turn):
+    draw(world, ellipse_points(15, 15, turn))
+    assert shapes(world) == []
+
+
+def test_a_small_circle_stays_as_drawn(world):
+    draw(world, ellipse_points(3.5, 3.5))  # 7 mm across, like a letter
+    assert shapes(world) == []
 
 
 def test_a_pause_between_strokes_splits_the_box(world):

@@ -79,7 +79,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         self.pressure.connect('toggled', lambda b: board.set_pressure_sensitive(b.get_active()))
         header.pack_end(self.pressure)
         self.shapes = Gtk.CheckButton(label='Shapes', active=True,
-                                      tooltip_text='Replace hand-drawn boxes and arrows with clean ones')
+                                      tooltip_text='Replace hand-drawn boxes, circles and arrows with clean ones')
         self.shapes.connect('toggled', lambda b: board.set_shapes(b.get_active()))
         header.pack_end(self.shapes)
         self.status_label = Gtk.Label(label='Starting…')

@@ -1,7 +1,7 @@
 import pytest
 
 from folio_board.adapter.for_remembering_the_drawing.json_file import JsonFileMemory, default_path
-from folio_board.hexagon.driven.for_remembering_the_drawing import Arrow, Box, RememberingError, Stroke
+from folio_board.hexagon.driven.for_remembering_the_drawing import Arrow, Box, Ellipse, RememberingError, Stroke
 
 
 def test_recalls_what_it_remembered_last(tmp_path):
@@ -16,6 +16,7 @@ def test_recalls_shapes_with_the_strokes_they_replaced(tmp_path):
     drawn = [Stroke(2, [(1, 2, 0.5), (3, 4, 0.5)])]
     items = [Stroke(0, [(5, 6, 0.25)]),
              Box(2, 0.5, (100, 200, 1100, 1700), drawn),
+             Ellipse(1, 0.75, (500, 600), (300, 200), drawn),
              Arrow(4, 0.3, (0, 0), (500, 100), (1000, 0), drawn + drawn)]
     JsonFileMemory(path).remember(items)
     assert JsonFileMemory(path).recall() == items
