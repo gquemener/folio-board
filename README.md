@@ -73,7 +73,8 @@ press the pad's button at any time.
 | Rotate the page    | Rotate    | `r`        |
 | Pressure on/off    | Pressure  | `p`        |
 | Save as PNG or SVG | Save      | `Ctrl+S`   |
-| Pick area to save  | drag with the mouse on the page | |
+| Copy as SVG        | Copy      | `Ctrl+C`   |
+| Pick area to save or copy | drag with the mouse on the page | |
 | Force a reconnect  | Reconnect |            |
 | Quit               |           | `q`, `Esc` |
 
@@ -90,8 +91,13 @@ hover dot.
 
 To save only part of the page, drag a rectangle over it with the mouse first:
 the rest is shaded and Save keeps only the framed area. Drag again to change it,
-or click outside the framed area to go back to saving the whole page. Rotating the page
+or click outside the framed area to go back to using the whole page. Rotating the page
 drops the crop.
+
+Copy puts the same page, or the framed area, on the clipboard as SVG, ready to
+paste into Figma, Inkscape or a slide. It is offered as `image/svg+xml`, as
+plain text (the SVG markup, which is what web apps like Figma read) and as a PNG
+for apps that only take pixels.
 
 ## Good to know
 

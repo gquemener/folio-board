@@ -7,8 +7,9 @@ created (the cursor stays put) and no root access is needed: we decode the
 UHID_INPUT2 packets ourselves and draw them.
 
 Usage: folio-board [BLUETOOTH_ADDRESS]
-Keys: c clear, Ctrl+Z undo, r rotate, p pressure on/off, Ctrl+S save, q / Esc quit.
-Drag with the mouse to pick the area to save; click outside it to save the whole page again.
+Keys: c clear, Ctrl+Z undo, r rotate, p pressure on/off, Ctrl+S save, Ctrl+C copy as SVG,
+q / Esc quit. Drag with the mouse to pick the area to save or copy; click outside it
+to use the whole page again.
 """
 import os
 import signal
@@ -17,6 +18,8 @@ import struct
 import subprocess
 import sys
 import time
+
+import io
 
 import gi
 
@@ -192,13 +195,19 @@ def render_page(cr, board, scale):
 
 def export(board, path):
     """Save the page, or its crop, as SVG (sized in points, true to paper) or, otherwise, PNG."""
+    with open(path, 'wb') as out:
+        render_file(board, out, path.lower().endswith('.svg'))
+
+
+def render_file(board, out, svg):
+    """Write the page, or its crop, to the binary file object out as SVG or PNG."""
     vw, vh = board.view_size
     x0, y0, x1, y1 = board.crop or (0, 0, vw, vh)
     w, h = x1 - x0, y1 - y0
     mm_per_unit = POINT_SIZE_UM / 1000
-    if path.lower().endswith('.svg'):
+    if svg:
         scale = mm_per_unit * 72 / MM_PER_INCH
-        surface = cairo.SVGSurface(path, w * scale, h * scale)
+        surface = cairo.SVGSurface(out, w * scale, h * scale)
     else:
         scale = mm_per_unit * PNG_DPI / MM_PER_INCH
         surface = cairo.ImageSurface(cairo.FORMAT_RGB24, max(1, round(w * scale)), max(1, round(h * scale)))
@@ -207,7 +216,7 @@ def export(board, path):
     cr.translate(-x0, -y0)
     render_page(cr, board, scale)
     if isinstance(surface, cairo.ImageSurface):
-        surface.write_to_png(path)
+        surface.write_to_png(out)
     surface.finish()
 
 
@@ -238,6 +247,9 @@ class BoardWindow(Gtk.ApplicationWindow):
         save = Gtk.Button(label='Save')
         save.connect('clicked', lambda _b: self.save())
         header.pack_end(save)
+        copy = Gtk.Button(label='Copy', tooltip_text='Copy as SVG, to paste in Figma or Inkscape')
+        copy.connect('clicked', lambda _b: self.copy())
+        header.pack_end(copy)
         self.pressure = Gtk.CheckButton(label='Pressure', active=board.pressure_sensitive,
                                         tooltip_text='Vary line width with pen pressure')
         self.pressure.connect('toggled', self.on_pressure_toggled)
@@ -261,6 +273,8 @@ class BoardWindow(Gtk.ApplicationWindow):
     def on_key(self, _ctrl, keyval, _code, state):
         if keyval in (Gdk.KEY_q, Gdk.KEY_Escape):
             self.close()
+        elif keyval == Gdk.KEY_c and state & Gdk.ModifierType.CONTROL_MASK:
+            self.copy()
         elif keyval == Gdk.KEY_c:
             self.clear()
         elif keyval == Gdk.KEY_r:
@@ -310,6 +324,24 @@ class BoardWindow(Gtk.ApplicationWindow):
             self.board.crop = None  # dragged along a page edge, nothing left to frame
         self.area.queue_draw()
         self.crop_start = self.crop_before = None
+
+    def copy(self):
+        """Put the page, or its crop, on the clipboard as SVG, and as PNG for apps that want pixels."""
+        svg, png = io.BytesIO(), io.BytesIO()
+        try:
+            render_file(self.board, svg, True)
+            render_file(self.board, png, False)
+        except cairo.Error as e:
+            self.status.set_label(f'Copy failed: {e}')
+            return
+        svg = GLib.Bytes.new(svg.getvalue())
+        # Browsers only hand web apps such as Figma plain text, so the SVG markup goes there too.
+        self.get_clipboard().set_content(Gdk.ContentProvider.new_union([
+            Gdk.ContentProvider.new_for_bytes('image/svg+xml', svg),
+            Gdk.ContentProvider.new_for_bytes('text/plain;charset=utf-8', svg),
+            Gdk.ContentProvider.new_for_bytes('image/png', GLib.Bytes.new(png.getvalue())),
+        ]))
+        self.status.set_label('Copied as SVG')
 
     def save(self):
         filters = Gio.ListStore.new(Gtk.FileFilter)
