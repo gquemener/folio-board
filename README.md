@@ -70,7 +70,7 @@ press the pad's button at any time.
 
 | Action             | Button    | Key        |
 | ------------------ | --------- | ---------- |
-| Clear the page     | Clear     | `c`        |
+| Clear the page (asks first) | Clear | `c`      |
 | Undo last stroke   | Undo      | `Ctrl+Z`   |
 | Rotate the page    | Rotate    | `r`        |
 | Pressure on/off    | Pressure  | `p`        |
@@ -79,6 +79,11 @@ press the pad's button at any time.
 | Pick area to save or copy | drag with the mouse on the page | |
 | Force a reconnect  | Reconnect |            |
 | Quit               |           | `q`, `Esc` |
+
+The drawing is kept between sessions: close the window, and the next
+`folio-board` shows the page as you left it, strokes and undo history included.
+It stays until you clear it. **Clear** asks for confirmation first, since a
+cleared drawing cannot be brought back.
 
 With **Pressure** checked (the default), pressing harder draws a thicker line.
 Uncheck it to draw every stroke at the same width.
@@ -117,8 +122,9 @@ bottom of the page to confirm it.
 
 ## Good to know
 
-- In live mode the pad does not store strokes in its memory: what you draw
-  only exists in the window.
+- In live mode the pad does not store strokes in its memory: folio-board keeps
+  them in `~/.local/state/folio-board/drawing.json` (under `$XDG_STATE_HOME`
+  if set), saved each time you lift the pen.
 - The pad sleeps after a while without use. If strokes stop appearing, press
   its button, then click **Reconnect**.
 - If Tuhi's daemon is installed somewhere other than
@@ -150,6 +156,7 @@ for what it is used for:
 | Driven | Presenter | `for_notifying_the_presenter` | GTK window                       |
 | Driven | Images    | `for_encoding_images`         | cairo (SVG, PNG)                 |
 | Driven | Files     | `for_storing_drawings`        | file system                      |
+| Driven | Memory    | `for_remembering_the_drawing` | JSON file                        |
 | Driven | Clipboard | `for_sharing_drawings`        | GTK clipboard                    |
 | Driven | Clock     | `for_telling_time`            | monotonic clock                  |
 
@@ -172,9 +179,9 @@ python -m pytest
 
 `tests/hexagon` drives the application through its driver ports, with the test
 doubles of `tests/doubles.py` on the driven ones, so it runs without a pad or a
-display. `tests/adapter` covers UHID decoding, image encoding and storage, and
-`tests/test_hexagon_isolation.py` checks that the hexagon imports nothing from
-the outside world.
+display. `tests/adapter` covers UHID decoding, image encoding, storage and the
+kept drawing, and `tests/test_hexagon_isolation.py` checks that the hexagon
+imports nothing from the outside world.
 
 ## License
 

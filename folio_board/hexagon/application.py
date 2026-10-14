@@ -6,6 +6,7 @@ from folio_board.hexagon.board import FALLBACK_PRESSURE_MAX, Board
 from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
 from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError
 from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingThePresenter
+from folio_board.hexagon.driven.for_remembering_the_drawing import ForRememberingTheDrawing, RememberingError
 from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings
 from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
 from folio_board.hexagon.driven.for_telling_time import ForTellingTime
@@ -37,12 +38,14 @@ class _NoPresenter(ForNotifyingThePresenter):
 class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
 
     def __init__(self, pad_size_um, pad: ForLinkingThePad, encoder: ForEncodingImages,
-                 storage: ForStoringDrawings, sharing: ForSharingDrawings, clock: ForTellingTime):
+                 storage: ForStoringDrawings, sharing: ForSharingDrawings, clock: ForTellingTime,
+                 memory: ForRememberingTheDrawing):
         w_um, h_um = pad_size_um
         if not w_um or not h_um:
             w_um, h_um = FALLBACK_DIMENSIONS_UM
         self.board = Board(w_um // UNIT_UM, h_um // UNIT_UM)
         self.pad, self.encoder, self.storage, self.sharing, self.clock = pad, encoder, storage, sharing, clock
+        self.memory = memory
         self.presenter: ForNotifyingThePresenter = _NoPresenter()
         self.connected = False
         self.started_at = 0
@@ -54,20 +57,28 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     # ForPresentingDrawings
 
     def start(self):
+        try:
+            self.board.strokes = self.memory.recall()
+        except RememberingError as e:
+            self.presenter.toast(f'Could not restore the last drawing: {e}')
+        self.presenter.page_changed()
         self._start_live()
 
     def stop(self):
         self.pad.stop_live()
+        self._remember()  # a stroke may still be under way
 
     def reconnect(self):
         self._start_live()
 
     def clear(self):
         self.board.clear()
+        self._remember()
         self.presenter.page_changed()
 
     def undo(self):
         self.board.undo()
+        self._remember()
         self.presenter.page_changed()
 
     def rotate(self):
@@ -119,8 +130,11 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     # ForReceivingPenInput
 
     def pen(self, in_range, x, y, pressure):
+        drawing = self.board.current
         if self.board.pen(in_range, x, y, pressure):
             self.presenter.toast(palette.COLORS[self.board.color][0])
+        if drawing is not None and self.board.current is not drawing:
+            self._remember()  # the pen lifted: the stroke is done
         self.presenter.page_changed()
 
     def pad_connected(self, pressure_max):
@@ -141,6 +155,12 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     def check_connection(self):
         if not self.connected and self.clock.now() - self.started_at >= RETRY_SECONDS:
             self._start_live()
+
+    def _remember(self):
+        try:
+            self.memory.remember(self.board.strokes)
+        except RememberingError as e:
+            self.presenter.status(f'Could not keep the drawing: {e}')
 
     def _start_live(self):
         self.pad.stop_live()

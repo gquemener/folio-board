@@ -1,7 +1,10 @@
 """Test doubles for the hexagon's driven ports. Each records what the application asked of it."""
+import copy
+
 from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
 from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError
 from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingThePresenter
+from folio_board.hexagon.driven.for_remembering_the_drawing import ForRememberingTheDrawing, RememberingError
 from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings
 from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
 from folio_board.hexagon.driven.for_telling_time import ForTellingTime
@@ -48,6 +51,26 @@ class InMemoryStorage(ForStoringDrawings):
         if self.error:
             raise StorageError(self.error)
         self.files[path] = data
+
+
+class InMemoryMemory(ForRememberingTheDrawing):
+    """ForRememberingTheDrawing: keeps a copy of the strokes, as a file would."""
+
+    def __init__(self, strokes=()):
+        self.strokes = [copy.deepcopy(s) for s in strokes]
+        self.remembered = 0
+        self.error = None
+
+    def remember(self, strokes):
+        if self.error:
+            raise RememberingError(self.error)
+        self.strokes = copy.deepcopy(strokes)
+        self.remembered += 1
+
+    def recall(self):
+        if self.error:
+            raise RememberingError(self.error)
+        return copy.deepcopy(self.strokes)
 
 
 class SharingSpy(ForSharingDrawings):

@@ -11,6 +11,7 @@ from gi.repository import GLib, GLibUnix, Gtk  # noqa: E402
 from folio_board.adapter.for_encoding_images.cairo import CairoEncoder  # noqa: E402
 from folio_board.adapter.for_presenting_drawings.gtk import BoardWindow  # noqa: E402
 from folio_board.adapter.for_receiving_pen_input.tuhi.live import TuhiError, TuhiPad  # noqa: E402
+from folio_board.adapter.for_remembering_the_drawing.json_file import JsonFileMemory  # noqa: E402
 from folio_board.adapter.for_sharing_drawings.gtk_clipboard import GtkClipboard  # noqa: E402
 from folio_board.adapter.for_storing_drawings.filesystem import FileSystemStorage  # noqa: E402
 from folio_board.adapter.for_telling_time.monotonic import MonotonicClock  # noqa: E402
@@ -23,7 +24,8 @@ def main(argv):
     except TuhiError as e:
         sys.exit(str(e))
     board = FolioBoard(pad.dimensions_um(), pad=pad, encoder=CairoEncoder(),
-                       storage=FileSystemStorage(), sharing=GtkClipboard(), clock=MonotonicClock())
+                       storage=FileSystemStorage(), sharing=GtkClipboard(), clock=MonotonicClock(),
+                       memory=JsonFileMemory())
 
     app = Gtk.Application(application_id='io.github.FolioBoard')
 

@@ -37,7 +37,7 @@ class Page:
 
 class ForPresentingDrawings:
     def start(self) -> None:
-        """Begin listening to the pad."""
+        """Bring back the drawing kept from the last session, then begin listening to the pad."""
         raise NotImplementedError
 
     def stop(self) -> None:
@@ -49,6 +49,7 @@ class ForPresentingDrawings:
         raise NotImplementedError
 
     def clear(self) -> None:
+        """Remove every stroke, from the drawing kept between sessions too."""
         raise NotImplementedError
 
     def undo(self) -> None:

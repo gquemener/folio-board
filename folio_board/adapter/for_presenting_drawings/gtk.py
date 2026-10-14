@@ -53,7 +53,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         self.set_child(overlay)
 
         header = Gtk.HeaderBar()
-        for label, handler in (('Clear', board.clear), ('Undo', board.undo), ('Rotate', board.rotate),
+        for label, handler in (('Clear', self.confirm_clear), ('Undo', board.undo), ('Rotate', board.rotate),
                                ('Reconnect', board.reconnect)):
             button = Gtk.Button(label=label)
             button.connect('clicked', lambda _b, h=handler: h())
@@ -113,7 +113,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         elif keyval == Gdk.KEY_c and ctrl:
             self.board.copy()
         elif keyval == Gdk.KEY_c:
-            self.board.clear()
+            self.confirm_clear()
         elif keyval == Gdk.KEY_r:
             self.board.rotate()
         elif keyval == Gdk.KEY_p:
@@ -136,6 +136,21 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         is_click = abs(dx) < MIN_CROP_PIXELS and abs(dy) < MIN_CROP_PIXELS
         self.board.end_crop(is_click, MIN_CROP_PIXELS / self.page_transform()[2])
         self.crop_start = None
+
+    def confirm_clear(self):
+        if not self.board.page().segments:
+            return  # nothing to lose
+        dialog = Gtk.AlertDialog(message='Clear the drawing?',
+                                 detail='It is kept between sessions until you clear it. This cannot be undone.',
+                                 buttons=['Cancel', 'Clear'], cancel_button=0, default_button=0)
+        dialog.choose(self, None, self.on_clear_chosen)
+
+    def on_clear_chosen(self, dialog, result):
+        try:
+            if dialog.choose_finish(result) == 1:
+                self.board.clear()
+        except GLib.Error:
+            pass  # dismissed
 
     def save(self):
         filters = Gio.ListStore.new(Gtk.FileFilter)

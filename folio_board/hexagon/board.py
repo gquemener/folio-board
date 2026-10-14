@@ -1,7 +1,6 @@
 """The page: strokes in pad units, how the page is turned, and the area framed for saving."""
-from dataclasses import dataclass, field
-
 from folio_board.hexagon import palette
+from folio_board.hexagon.driven.for_remembering_the_drawing import Stroke
 from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Swatch
 
 # Slate / Folio value, used until the pad reports the real one.
@@ -13,12 +12,6 @@ PEN_MAX_WIDTH_MM = 2.4
 PEN_FIXED_WIDTH_MM = 0.8
 ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape']
 STRIP_UNITS = palette.STRIP_MM * 1000 // UNIT_UM
-
-
-@dataclass
-class Stroke:
-    color: int  # index in palette.COLORS
-    points: list = field(default_factory=list)  # (x, y, pressure from 0 to 1), in pad units
 
 
 class Board:
