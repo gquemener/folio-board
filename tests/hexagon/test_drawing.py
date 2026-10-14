@@ -16,7 +16,6 @@ def test_page_is_the_pad_turned_to_portrait(world):
     assert world.app.view_size() == (14800, 21000)
     page = world.app.page()
     assert (page.width, page.height, page.segments, page.crop, page.hover) == (14800, 21000, (), None, None)
-    assert len(page.palette) == 16
 
 
 def test_unknown_pad_size_falls_back_to_a4():

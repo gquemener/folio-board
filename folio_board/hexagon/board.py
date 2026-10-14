@@ -1,7 +1,7 @@
 """The page: strokes and shapes in pad units, how the page is turned, and the area framed for saving."""
 from folio_board.hexagon import palette, shapes
 from folio_board.hexagon.driven.for_remembering_the_drawing import Item, Stroke
-from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Orientation, Swatch
+from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Orientation, PenColor
 
 # Slate / Folio value, used until the pad reports the real one.
 FALLBACK_PRESSURE_MAX = 2047
@@ -10,8 +10,6 @@ PEN_MIN_WIDTH_MM = 0.2
 PEN_MAX_WIDTH_MM = 2.4
 # Stroke width on paper when pressure sensitivity is off.
 PEN_FIXED_WIDTH_MM = 0.8
-STRIP_TOP_UNITS = palette.STRIP_TOP_MM * 1000 // UNIT_UM
-STRIP_BOTTOM_UNITS = STRIP_TOP_UNITS + palette.STRIP_MM * 1000 // UNIT_UM
 
 
 class Board:
@@ -24,9 +22,7 @@ class Board:
         self.hover = None
         self.pressure_max = FALLBACK_PRESSURE_MAX
         self.pressure_sensitive = True
-        self.color = 0
-        # The pen went down on the palette strip and has not been lifted since.
-        self.picking = False
+        self.color = 0  # index in palette.COLORS
         # Area to save, as (x0, y0, x1, y1) in view units, or None for the whole page.
         self.crop = None
         self.crop_start = None
@@ -43,51 +39,22 @@ class Board:
         w, h = self.view_size
         if self.orientation == 'portrait':
             return w - y, x
-        return w - x, h - y  # landscape: the pad's top edge, and the palette strip, on the right
+        return w - x, h - y  # landscape: the pad's top edge on the right
 
     def pen(self, in_range, x, y, pressure):
-        """Follow the pen; True when it just picked a color on the palette strip."""
         if not in_range or pressure == 0:
             self.hover = (x, y) if in_range else None
             self.current = None
-            self.picking = False
-            return False
+            return
         self.hover = (x, y)
-        if self.picking:
-            return False  # wait for the pen to lift, so a slide off the strip draws nothing
         if self.current is None:
-            swatch = self.swatch_at(x, y)
-            if swatch is not None:
-                self.color = swatch
-                self.picking = True
-                return True
             self.current = Stroke(self.color)
             self.items.append(self.current)
         self.current.points.append((x, y, min(pressure / self.pressure_max, 1.0)))
-        return False
 
-    def to_portrait(self, x, y):
-        """Pad units to the page as shown in portrait, where the palette strip is along the top."""
-        return self.pad_h - y, x
-
-    def swatch_at(self, x, y):
-        """Index of the palette color under pad point (x, y), or None off the strip."""
-        px, py = self.to_portrait(x, y)
-        if not (STRIP_TOP_UNITS <= py < STRIP_BOTTOM_UNITS and 0 <= px <= self.pad_h):
-            return None
-        return min(int(px * len(palette.COLORS) // self.pad_h), len(palette.COLORS) - 1)
-
-    def swatches(self):
-        """The palette strip's boxes, in view units."""
-        n = len(palette.COLORS)
-        swatches = []
-        for i, (name, value) in enumerate(palette.COLORS):
-            # Box i spans portrait x from i/n to (i+1)/n of the strip: pad y counts the other way.
-            (ax, ay) = self.to_view(STRIP_TOP_UNITS, self.pad_h * (n - i) / n)
-            (bx, by) = self.to_view(STRIP_BOTTOM_UNITS, self.pad_h * (n - i - 1) / n)
-            rect = (min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))
-            swatches.append(Swatch(rect, palette.rgb(value), name, i == self.color))
-        return tuple(swatches)
+    def pen_color(self):
+        name, value = palette.COLORS[self.color]
+        return PenColor(name, palette.rgb(value))
 
     def replace(self, strokes, shape):
         """Put shape where the first of these strokes was, and drop them."""

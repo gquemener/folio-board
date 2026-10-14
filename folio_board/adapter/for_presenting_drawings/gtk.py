@@ -22,6 +22,11 @@ from folio_board.lib.cairo_page import draw_paper, draw_strokes  # noqa: E402
 # A crop drag shorter than this, in screen pixels, is a click: outside the crop it drops it.
 MIN_CROP_PIXELS = 8
 TOAST_MS = 1500
+# The top row of a French AZERTY keyboard, without Shift, picks the palette's colors in order:
+# & é " ' ( - è _ ç. The next key, à, is kept for later.
+COLOR_KEYS = {key: color for color, key in enumerate((
+    Gdk.KEY_ampersand, Gdk.KEY_eacute, Gdk.KEY_quotedbl, Gdk.KEY_apostrophe, Gdk.KEY_parenleft,
+    Gdk.KEY_minus, Gdk.KEY_egrave, Gdk.KEY_underscore, Gdk.KEY_ccedilla))}
 TOAST_CSS = '.toast { background: rgba(0, 0, 0, 0.75); color: white; border-radius: 99px; padding: 8px 20px; }'
 
 
@@ -84,6 +89,9 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         header.pack_end(self.shapes)
         self.status_label = Gtk.Label(label='Starting…')
         header.pack_end(self.status_label)
+        self.pen_label = Gtk.Label(tooltip_text='Pen color: keys & é " \' ( - è _ ç')
+        header.pack_end(self.pen_label)
+        self.show_pen_color()
         self.set_titlebar(header)
 
         drag = Gtk.GestureDrag(button=Gdk.BUTTON_PRIMARY)
@@ -137,6 +145,9 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
             (self.portrait if self.landscape.get_active() else self.landscape).set_active(True)
         elif keyval == Gdk.KEY_p:
             self.pressure.set_active(not self.pressure.get_active())
+        elif keyval in COLOR_KEYS:
+            self.board.set_color(COLOR_KEYS[keyval])
+            self.show_pen_color()
         elif keyval == Gdk.KEY_o:
             self.shapes.set_active(not self.shapes.get_active())
         elif keyval == Gdk.KEY_s and ctrl:
@@ -193,6 +204,11 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
 
     # Showing the page
 
+    def show_pen_color(self):
+        pen = self.board.page().pen
+        hex_color = '#' + ''.join(f'{round(c * 255):02x}' for c in pen.color)
+        self.pen_label.set_markup(f'<span foreground="{hex_color}">⬤</span> {GLib.markup_escape_text(pen.name)}')
+
     def hide_toast(self):
         self.toast_revealer.set_reveal_child(False)
         self.toast_timeout = None
@@ -210,28 +226,6 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         ox, oy, scale = self.page_transform()
         return (x - ox) / scale, (y - oy) / scale
 
-    def draw_palette(self, cr, page, scale):
-        """The palette strip, under the strokes, with the selected color framed."""
-        for swatch in page.palette:
-            x0, y0, x1, y1 = swatch.rect
-            cr.rectangle(x0, y0, x1 - x0, y1 - y0)
-            cr.set_source_rgb(*swatch.color)
-            cr.fill_preserve()
-            cr.set_source_rgb(0.75, 0.75, 0.78)
-            cr.set_line_width(1 / scale)
-            cr.stroke()
-        for swatch in page.palette:
-            if swatch.selected:
-                x0, y0, x1, y1 = swatch.rect
-                inset = 2.5 / scale
-                cr.rectangle(x0 + inset, y0 + inset, x1 - x0 - 2 * inset, y1 - y0 - 2 * inset)
-                cr.set_source_rgb(0.15, 0.15, 0.18)
-                cr.set_line_width(3 / scale)
-                cr.stroke_preserve()
-                cr.set_source_rgb(1, 1, 1)
-                cr.set_line_width(1 / scale)
-                cr.stroke()
-
     def on_draw(self, _area, cr, _width, _height):
         cr.set_source_rgb(0.18, 0.18, 0.2)
         cr.paint()
@@ -241,7 +235,6 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         cr.translate(ox, oy)
         cr.scale(scale, scale)
         draw_paper(cr, page)
-        self.draw_palette(cr, page, scale)
         draw_strokes(cr, page, scale)
 
         if page.crop:

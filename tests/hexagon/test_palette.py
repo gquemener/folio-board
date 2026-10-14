@@ -1,17 +1,11 @@
-"""The palette strip, 15 mm below the pad's top edge: tapping a box picks the color of the next strokes."""
+"""The presenter picks the pen color with the keys & é " ' ( - è _ ç of a French keyboard: black,
+orange, blue, green, yellow, red, lilac, pink and brown. The whole pad is for drawing."""
 import pytest
 
 from folio_board.hexagon import palette
+from folio_board.hexagon.driver.for_presenting_drawings import PenColor
 
-# The A5 test pad is 14800 units wide in portrait: 16 boxes of 925 units, 1500 units (15 mm) high,
-# from 15 mm to 30 mm below the top edge.
-BOX = 925
-
-
-def tap(app, portrait_x, portrait_y=2200):
-    """Tap the pen at a point given as seen in portrait: pad x is portrait y, pad y is 14800 - portrait x."""
-    app.pen(True, portrait_y, 14800 - portrait_x, 800)
-    app.pen(True, portrait_y, 14800 - portrait_x, 0)
+NAMES = ['Black', 'Orange', 'Blue', 'Green', 'Yellow', 'Red', 'Lilac', 'Pink', 'Brown']
 
 
 def stroke(app, *pad_points):
@@ -24,94 +18,50 @@ def colors(app):
     return [s[5] for s in app.page().segments]
 
 
+def test_the_palette_has_nine_colors_in_key_order():
+    assert [name for name, _ in palette.COLORS] == NAMES
+
+
 def test_black_is_picked_at_first(world):
     stroke(world.app, (5000, 5000), (6000, 6000))
     assert set(colors(world.app)) == {(0, 0, 0)}
-    assert [s.selected for s in world.app.page().palette] == [True] + [False] * 15
+    assert world.app.page().pen.name == 'Black'
 
 
-@pytest.mark.parametrize('index', range(16))
-def test_tapping_a_box_picks_its_color(world, index):
-    tap(world.app, index * BOX + BOX / 2)
+@pytest.mark.parametrize('index', range(9))
+def test_picking_a_color_draws_the_next_strokes_in_it_and_says_so(world, index):
+    world.app.set_color(index)
     stroke(world.app, (5000, 5000), (6000, 6000))
     name, value = palette.COLORS[index]
     assert set(colors(world.app)) == {palette.rgb(value)}
     assert world.presenter.toasts == [name]
-    assert [s.selected for s in world.app.page().palette].index(True) == index
+    assert world.app.page().pen == PenColor(name, palette.rgb(value))
 
 
-def test_tapping_draws_nothing(world):
-    tap(world.app, 3 * BOX)
-    assert world.app.page().segments == ()
-
-
-def test_sliding_off_the_strip_draws_nothing_until_the_pen_lifts(world):
-    world.app.pen(True, 2200, 5000, 800)
-    world.app.pen(True, 4000, 5000, 800)
-    world.app.pen(True, 6000, 5000, 800)
-    assert world.app.page().segments == ()
-    world.app.pen(True, 6000, 5000, 0)
-    stroke(world.app, (7000, 5000))
-    assert len(world.app.page().segments) == 1
-
-
-def test_leaving_range_ends_the_tap(world):
-    world.app.pen(True, 2200, 5000, 800)
-    world.app.pen(False, 0, 0, 0)
-    stroke(world.app, (7000, 5000))
-    assert len(world.app.page().segments) == 1
+@pytest.mark.parametrize('index', [-1, 9, 15])
+def test_other_colors_are_left_alone(world, index):
+    world.app.set_color(2)
+    world.app.set_color(index)
+    assert world.app.page().pen.name == 'Blue'
+    assert world.presenter.toasts == ['Blue']
 
 
 def test_strokes_keep_their_color(world):
-    tap(world.app, 4 * BOX + 10)                # red
+    world.app.set_color(5)
     stroke(world.app, (5000, 5000))
-    tap(world.app, 1 * BOX + 10)                # blue
+    world.app.set_color(2)
     stroke(world.app, (8000, 8000))
-    assert colors(world.app) == [palette.rgb(0xAA0000), palette.rgb(0x0000AA)]
+    assert colors(world.app) == [palette.rgb(0xD62828), palette.rgb(0x1E5BD6)]
 
 
-def test_a_stroke_may_run_into_the_strip(world):
-    stroke(world.app, (4000, 5000), (2200, 5000), (300, 7000))
-    assert len(world.app.page().segments) == 3
+def test_the_top_of_the_pad_is_for_drawing(world):
+    stroke(world.app, (0, 7000), (2200, 7000))
+    assert len(world.app.page().segments) == 2
     assert world.presenter.toasts == []
 
 
-@pytest.mark.parametrize('mm_from_top, on_strip', [
-    (14.99, False),
-    (15, True),
-    (29.99, True),
-    (30, False),
-])
-def test_the_strip_runs_from_15_to_30_mm_below_the_top_edge(world, mm_from_top, on_strip):
-    world.app.pen(True, round(mm_from_top * 100), 5000, 800)
-    world.app.pen(True, round(mm_from_top * 100), 5000, 0)
-    assert len(world.presenter.toasts) == on_strip
-    assert len(world.app.page().segments) == (not on_strip)
-
-
-def test_boxes_cover_the_whole_width(world):
-    tap(world.app, 0)
-    tap(world.app, 14800)
-    assert world.presenter.toasts == ['Black', 'White']
-
-
-def test_swatches_lie_near_the_top_in_portrait(world):
-    swatches = world.app.page().palette
-    assert [s.name for s in swatches] == [name for name, _ in palette.COLORS]
-    assert swatches[0].rect == (0, 1500, BOX, 3000)
-    assert swatches[15].rect == (15 * BOX, 1500, 14800, 3000)
-
-
-def test_the_strip_stays_on_the_pads_top_edge_in_landscape(world):
-    world.app.set_orientation('landscape')
-    swatches = world.app.page().palette
-    # Black, top left in portrait, goes to the top, near the right edge.
-    assert (swatches[0].rect, swatches[15].rect) == ((21000 - 3000, 0, 21000 - 1500, BOX),
-                                                     (21000 - 3000, 14800 - BOX, 21000 - 1500, 14800))
-
-
-def test_picking_survives_clearing(world):
-    tap(world.app, 2 * BOX + 10)
+def test_the_color_survives_clearing(world):
+    world.app.set_color(3)
     world.app.clear()
     stroke(world.app, (5000, 5000))
-    assert colors(world.app) == [palette.rgb(0x00AA00)]
+    assert colors(world.app) == [palette.rgb(0x2E9D46)]

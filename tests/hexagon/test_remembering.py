@@ -9,11 +9,11 @@ def draw(app, *points, pressure=1024):
 
 
 def test_start_brings_back_the_kept_drawing(world):
-    world.memory.items = [Stroke(4, [(3100, 200, 0.5), (3300, 400, 0.5)])]
+    world.memory.items = [Stroke(5, [(3100, 200, 0.5), (3300, 400, 0.5)])]
     world.app.start()
     segments = world.app.page().segments
     assert [s[:4] for s in segments] == [(14600, 3100, 14600, 3100), (14600, 3100, 14400, 3300)]
-    assert segments[0][5] == (2 / 3, 0, 0)  # red
+    assert segments[0][5] == (0xD6 / 255, 0x28 / 255, 0x28 / 255)  # red
     assert world.presenter.redraws == 1
 
 
@@ -38,12 +38,6 @@ def test_each_stroke_is_kept_when_the_pen_lifts(world):
     assert world.memory.items == [Stroke(0, [(3100, 200, 1000 / 2047), (3200, 300, 1000 / 2047)])]
     world.app.pen(False, 0, 0, 0)
     assert world.memory.remembered == 1
-
-
-def test_picking_a_color_keeps_nothing(world):
-    world.app.pen(True, 2000, 7000, 1000)
-    world.app.pen(True, 2000, 7000, 0)
-    assert world.memory.remembered == 0
 
 
 def test_clear_is_kept(world):

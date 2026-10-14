@@ -13,12 +13,10 @@ Orientation = Literal['portrait', 'landscape']
 
 
 @dataclass(frozen=True)
-class Swatch:
-    """One box of the palette strip: tapping it with the pen picks its color."""
-    rect: Rect
-    color: Color
+class PenColor:
+    """The color the next strokes are drawn in."""
     name: str
-    selected: bool
+    color: Color
 
 
 @dataclass(frozen=True)
@@ -42,8 +40,7 @@ class Page:
     crop: Optional[Rect] = None
     # Where the pen hovers, or None when it is out of range.
     hover: Optional[Point] = None
-    # The palette strip along the pad's top edge. It is not part of the drawing.
-    palette: tuple[Swatch, ...] = ()
+    pen: PenColor = PenColor('Black', (0, 0, 0))
 
 
 class ForPresentingDrawings:
@@ -70,6 +67,11 @@ class ForPresentingDrawings:
 
     def set_pressure_sensitive(self, on: bool) -> None:
         """Vary line width with pen pressure, or draw every stroke at the same width."""
+        raise NotImplementedError
+
+    def set_color(self, color: int) -> None:
+        """Draw the next strokes in this color: its index in the palette, from 0 (black) to 8 (brown),
+        the keys & é " ' ( - è _ ç of a French keyboard in that order. Other indexes are left alone."""
         raise NotImplementedError
 
     def set_shapes(self, on: bool) -> None:

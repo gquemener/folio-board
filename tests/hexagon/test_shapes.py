@@ -36,7 +36,7 @@ PAUSE = 0.4
 def replay(world, indexes, pause=PAUSE, color_between=None):
     for n, i in enumerate(indexes):
         if color_between is not None and n:
-            tap_color(world, color_between)
+            world.app.set_color(color_between)
         stroke = SAMPLES[i]
         for x, y, p in stroke['points']:
             world.app.pen(True, x, y, max(1, round(p * 2047)))
@@ -58,13 +58,6 @@ def ellipse_points(rx, ry, turn=1.1, center=(15000, 10000)):
     return [(center[0] + rx * 100 * (1 + 0.03 * math.sin(3 * t)) * math.cos(t),
              center[1] + ry * 100 * (1 + 0.03 * math.sin(3 * t)) * math.sin(t))
             for t in (2 * math.pi * turn * k / 400 for k in range(401))]
-
-
-def tap_color(world, index):
-    # The A4 pad is 21600 units high: box i of the strip spans pad y from (16 - i) / 16 down.
-    y = 21600 * (16 - index - 0.5) / 16
-    world.app.pen(True, 2200, y, 800)
-    world.app.pen(True, 2200, y, 0)
 
 
 def shapes(world):
@@ -144,7 +137,7 @@ def test_changing_color_between_strokes_splits_the_box(world):
 
 
 def test_a_shape_keeps_its_strokes_color(world):
-    tap_color(world, 4)
+    world.app.set_color(4)
     replay(world, SAMPLE_AREAS['box in 1 stroke'])
     assert shapes(world)[0].color == 4
 

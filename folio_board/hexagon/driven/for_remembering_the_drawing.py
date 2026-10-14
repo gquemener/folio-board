@@ -7,7 +7,7 @@ Point = tuple[float, float]
 
 @dataclass
 class Stroke:
-    color: int  # index in palette.COLORS
+    color: int  # index in palette.COLORS, from 0 (black) to 8 (brown)
     points: list = field(default_factory=list)  # (x, y, pressure from 0 to 1), in pad units
 
 

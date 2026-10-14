@@ -74,6 +74,7 @@ press the pad's button at any time.
 | Portrait / landscape        | Portrait, Landscape             | `r`        |
 | Pressure on/off             | Pressure                        | `p`        |
 | Shapes on/off               | Shapes                          | `o`        |
+| Pen color                   |                                 | `&` to `ç` |
 | Save as PNG or SVG          | Save                            | `Ctrl+S`   |
 | Copy as SVG                 | Copy                            | `Ctrl+C`   |
 | Pick area to save or copy   | drag with the mouse on the page |            |
@@ -118,16 +119,18 @@ The shape appears as soon as its last stroke is done.
 
 ### Colors
 
-A 15 mm band of the pad, starting 15 mm below its top edge (in portrait), is a
-palette strip with the 16 CGA / EGA colors of 8-bit era PCs, black on the left to white on the right. Tap a box
-with the pen to draw the next strokes in its color. A tap is never drawn, even
-if the pen slides off the strip before lifting. The window shows the strip with
-the current color framed, and briefly names the color you picked.
+Press a key of the top row of a French (AZERTY) keyboard, without Shift, to
+draw the next strokes in another color:
 
-Mark the boxes on the paper (or keep a printed strip there) so you can find
-them without looking at the screen. Each box is 1/16 of the pad's width,
-13.5 mm on an A4 Folio. The strip stays near the pad's top edge, which is on
-the right in landscape, and it is left out of saved and copied images.
+| Key | Color  | Key | Color  | Key | Color |
+| --- | ------ | --- | ------ | --- | ----- |
+| `&` | Black  | `'` | Green  | `è` | Lilac |
+| `é` | Orange | `(` | Yellow | `_` | Pink  |
+| `"` | Blue   | `-` | Red    | `ç` | Brown |
+
+The window briefly names the color you picked, and the header shows the
+current one. Each session starts in black, and strokes keep the color they
+were drawn in. `à`, the next key, does nothing for now.
 
 The red dot shows where the pen hovers, so viewers can follow it before it
 touches the paper.

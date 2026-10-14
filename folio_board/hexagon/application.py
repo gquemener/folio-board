@@ -104,6 +104,12 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
             self._remember_settings()
             self.presenter.page_changed()
 
+    def set_color(self, color):
+        if 0 <= color < len(palette.COLORS):
+            self.board.color = color
+            self.presenter.toast(palette.COLORS[color][0])
+            self.presenter.page_changed()
+
     def set_shapes(self, on):
         if on != self.shapes:
             self.shapes = on
@@ -146,7 +152,7 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     def page(self):
         vw, vh = self.board.view_size
         hover = self.board.to_view(*self.board.hover) if self.board.hover else None
-        return Page(vw, vh, self.board.segments(), self.board.crop, hover, self.board.swatches())
+        return Page(vw, vh, self.board.segments(), self.board.crop, hover, self.board.pen_color())
 
     def settings(self):
         return Settings(self.board.orientation, self.board.pressure_sensitive, self.shapes)
@@ -155,8 +161,7 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
 
     def pen(self, in_range, x, y, pressure):
         drawing = self.board.current
-        if self.board.pen(in_range, x, y, pressure):
-            self.presenter.toast(palette.COLORS[self.board.color][0])
+        self.board.pen(in_range, x, y, pressure)
         if drawing is None and self.board.current is not None:
             self.stroke_started = self.clock.now()
         if drawing is not None and self.board.current is not drawing:
