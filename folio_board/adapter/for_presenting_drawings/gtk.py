@@ -15,6 +15,8 @@ from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 import cairo  # noqa: E402
 
+from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingThePresenter  # noqa: E402
+from folio_board.hexagon.driver.for_presenting_drawings import ForPresentingDrawings  # noqa: E402
 from folio_board.lib.cairo_page import draw_page  # noqa: E402
 
 # A crop drag shorter than this, in screen pixels, is a click: outside the crop it drops it.
@@ -28,9 +30,8 @@ def pictures_dir():
     return path or os.path.expanduser('~/Pictures')
 
 
-class BoardWindow(Gtk.ApplicationWindow):
-    def __init__(self, app, board):
-        """board is the application's ForPresentingDrawings port."""
+class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
+    def __init__(self, app, board: ForPresentingDrawings):
         super().__init__(application=app, title='Folio board')
         self.board = board
         self.set_default_size(700, 950)

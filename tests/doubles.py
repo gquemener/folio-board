@@ -1,10 +1,13 @@
 """Test doubles for the hexagon's driven ports. Each records what the application asked of it."""
-from folio_board.hexagon.driven.for_encoding_images import EncodingError
-from folio_board.hexagon.driven.for_linking_the_pad import PadLinkError
-from folio_board.hexagon.driven.for_storing_drawings import StorageError
+from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
+from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError
+from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingThePresenter
+from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings
+from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
+from folio_board.hexagon.driven.for_telling_time import ForTellingTime
 
 
-class FakePad:
+class FakePad(ForLinkingThePad):
     """ForLinkingThePad: start_live fails with fail_with, if set."""
 
     def __init__(self):
@@ -20,7 +23,7 @@ class FakePad:
         self.calls.append('stop_live')
 
 
-class StubEncoder:
+class StubEncoder(ForEncodingImages):
     """ForEncodingImages: returns a recognisable fake image and keeps the pages it got."""
 
     def __init__(self):
@@ -34,7 +37,7 @@ class StubEncoder:
         return f'{fmt} image'.encode()
 
 
-class InMemoryStorage:
+class InMemoryStorage(ForStoringDrawings):
     """ForStoringDrawings."""
 
     def __init__(self):
@@ -47,7 +50,7 @@ class InMemoryStorage:
         self.files[path] = data
 
 
-class SharingSpy:
+class SharingSpy(ForSharingDrawings):
     """ForSharingDrawings."""
 
     def __init__(self):
@@ -57,7 +60,7 @@ class SharingSpy:
         self.shared.append((svg, png))
 
 
-class PresenterSpy:
+class PresenterSpy(ForNotifyingThePresenter):
     """ForNotifyingThePresenter."""
 
     def __init__(self):
@@ -79,7 +82,7 @@ class PresenterSpy:
         self.reconnect = available
 
 
-class FakeClock:
+class FakeClock(ForTellingTime):
     """ForTellingTime: time only moves when a test says so."""
 
     def __init__(self):

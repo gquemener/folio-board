@@ -1,8 +1,8 @@
 """ForStoringDrawings on the local file system."""
-from folio_board.hexagon.driven.for_storing_drawings import StorageError
+from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
 
 
-class FileSystemStorage:
+class FileSystemStorage(ForStoringDrawings):
     def store(self, path, data):
         try:
             with open(path, 'wb') as out:

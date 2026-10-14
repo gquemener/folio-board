@@ -1,5 +1,4 @@
 """Driven port for the pad: the application asks it to stream pen input, or to stop."""
-from typing import Protocol
 
 
 class PadLinkError(Exception):
@@ -8,8 +7,10 @@ class PadLinkError(Exception):
         self.code = code
 
 
-class ForLinkingThePad(Protocol):
+class ForLinkingThePad:
     def start_live(self) -> None:
         """Wait for the pad and stream its pen input; raises PadLinkError if that cannot start."""
+        raise NotImplementedError
 
-    def stop_live(self) -> None: ...
+    def stop_live(self) -> None:
+        raise NotImplementedError

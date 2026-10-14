@@ -3,7 +3,7 @@ import io
 
 import cairo
 
-from folio_board.hexagon.driven.for_encoding_images import EncodingError
+from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
 from folio_board.hexagon.driver.for_presenting_drawings import UNIT_MM
 from folio_board.lib.cairo_page import draw_page
 
@@ -11,7 +11,7 @@ PNG_DPI = 200
 MM_PER_INCH = 25.4
 
 
-class CairoEncoder:
+class CairoEncoder(ForEncodingImages):
     def encode(self, page, fmt):
         x0, y0, x1, y1 = page.crop or (0, 0, page.width, page.height)
         w, h = x1 - x0, y1 - y0

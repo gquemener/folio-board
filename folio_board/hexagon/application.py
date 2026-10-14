@@ -8,7 +8,8 @@ from folio_board.hexagon.driven.for_notifying_the_presenter import ForNotifyingT
 from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings
 from folio_board.hexagon.driven.for_storing_drawings import ForStoringDrawings, StorageError
 from folio_board.hexagon.driven.for_telling_time import ForTellingTime
-from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Page
+from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, ForPresentingDrawings, Page
+from folio_board.hexagon.driver.for_receiving_pen_input import ForReceivingPenInput
 
 # The pad link tries to reach the pad for ~25 s per start, then gives up: start again after this.
 RETRY_SECONDS = 30
@@ -16,7 +17,7 @@ RETRY_SECONDS = 30
 FALLBACK_DIMENSIONS_UM = (297000, 216000)
 
 
-class _NoPresenter:
+class _NoPresenter(ForNotifyingThePresenter):
     """Stands in until the presenter's screen exists."""
 
     def page_changed(self):
@@ -32,8 +33,7 @@ class _NoPresenter:
         pass
 
 
-class FolioBoard:
-    """Implements ForPresentingDrawings and ForReceivingPenInput."""
+class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
 
     def __init__(self, pad_size_um, pad: ForLinkingThePad, encoder: ForEncodingImages,
                  storage: ForStoringDrawings, sharing: ForSharingDrawings, clock: ForTellingTime):

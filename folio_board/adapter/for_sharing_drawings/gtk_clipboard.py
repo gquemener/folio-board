@@ -4,8 +4,10 @@ import gi
 gi.require_version('Gdk', '4.0')
 from gi.repository import Gdk, GLib  # noqa: E402
 
+from folio_board.hexagon.driven.for_sharing_drawings import ForSharingDrawings  # noqa: E402
 
-class GtkClipboard:
+
+class GtkClipboard(ForSharingDrawings):
     def share(self, svg, png):
         svg = GLib.Bytes.new(svg)
         # Browsers only hand web apps such as Figma plain text, so the SVG markup goes there too.

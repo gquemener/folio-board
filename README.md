@@ -143,6 +143,13 @@ for what it is used for:
 Adapters live in `folio_board/adapter/<port>/<technology>`, and
 `folio_board/startup.py` wires them to the hexagon.
 
+Ports are plain base classes that their implementations subclass explicitly, so
+an editor can navigate them. *Show type hierarchy* (subtypes) on a port lists
+the adapters and test doubles behind a driven port, and the hexagon behind a
+driver port. *Go to implementation* on a port method does the same. *Find
+references* on a driver port finds the driver adapters that call it.
+`pyrefly.toml` makes pyrefly index the whole project for this.
+
 ### Tests
 
 ```sh

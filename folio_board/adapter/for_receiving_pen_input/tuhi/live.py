@@ -19,7 +19,8 @@ gi.require_version('GLibUnix', '2.0')
 from gi.repository import Gio, GLib, GLibUnix  # noqa: E402
 
 from folio_board.adapter.for_receiving_pen_input.tuhi import uhid  # noqa: E402
-from folio_board.hexagon.driven.for_linking_the_pad import PadLinkError  # noqa: E402
+from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError  # noqa: E402
+from folio_board.hexagon.driver.for_receiving_pen_input import ForReceivingPenInput  # noqa: E402
 
 BUS = 'org.freedesktop.tuhi1'
 DEVICE_IFACE = 'org.freedesktop.tuhi1.Device'
@@ -32,7 +33,7 @@ class TuhiError(Exception):
     """Tuhi cannot be used; the message says what to do."""
 
 
-class TuhiPad:
+class TuhiPad(ForLinkingThePad):
     def __init__(self, address=None):
         self.bus = Gio.bus_get_sync(Gio.BusType.SESSION)
         self.server = ensure_tuhi(self.bus)
@@ -42,7 +43,7 @@ class TuhiPad:
         except Exception:
             self.close()
             raise
-        self.pen_input = None
+        self.pen_input: ForReceivingPenInput | None = None
         self.sock = None
         self.watch = None
 
@@ -50,8 +51,8 @@ class TuhiPad:
         """The pad's drawing area as tuhi knows it, (0, 0) if it has not read it yet."""
         return tuple(self._get_property('Dimensions'))
 
-    def drive(self, pen_input):
-        """Start reporting to pen_input, a ForReceivingPenInput."""
+    def drive(self, pen_input: ForReceivingPenInput):
+        """Start reporting what the pad does to pen_input."""
         self.pen_input = pen_input
         self.bus.signal_subscribe(BUS, None, None, self.device_path, None,
                                   Gio.DBusSignalFlags.NONE, self._on_signal)
