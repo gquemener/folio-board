@@ -47,10 +47,12 @@ and follow the registration steps. You can close Tuhi afterwards.
 
 ```sh
 git clone https://github.com/<you>/folio-board.git
-install -Dm755 folio-board/folio-board ~/.local/bin/folio-board
+ln -s "$PWD/folio-board/folio-board" ~/.local/bin/folio-board
 ```
 
-Make sure `~/.local/bin` is in your `PATH`.
+Make sure `~/.local/bin` is in your `PATH`. The `folio-board` script loads the
+`folio_board` package next to it, so link it rather than copying it, and keep
+the clone in place.
 
 ## Usage
 
@@ -118,6 +120,41 @@ writes kernel UHID packets to it. folio-board passes one end of a socket pair
 instead, decodes the `UHID_INPUT2` packets (in-range flag, x, y, pressure)
 itself and renders them with cairo. Because no kernel device is created, the
 pen never moves your cursor and `/dev/uhid` permissions don't matter.
+
+## Architecture
+
+The code follows the hexagonal architecture (ports and adapters), as laid out in
+[Garrido de Paz's implementation guide](https://jmgarridopaz.github.io/content/hexagonalarchitecture-ig/intro.html).
+`folio_board/hexagon` holds what the application does, with no GTK, Tuhi, cairo
+or file access. It talks to the outside world only through ports, each named
+for what it is used for:
+
+| Side   | Actor     | Port                          | Adapter                          |
+| ------ | --------- | ----------------------------- | -------------------------------- |
+| Driver | Presenter | `for_presenting_drawings`     | GTK window                       |
+| Driver | Pad       | `for_receiving_pen_input`     | Tuhi live mode (D-Bus, UHID)     |
+| Driven | Pad       | `for_linking_the_pad`         | Tuhi live mode                   |
+| Driven | Presenter | `for_notifying_the_presenter` | GTK window                       |
+| Driven | Images    | `for_encoding_images`         | cairo (SVG, PNG)                 |
+| Driven | Files     | `for_storing_drawings`        | file system                      |
+| Driven | Clipboard | `for_sharing_drawings`        | GTK clipboard                    |
+| Driven | Clock     | `for_telling_time`            | monotonic clock                  |
+
+Adapters live in `folio_board/adapter/<port>/<technology>`, and
+`folio_board/startup.py` wires them to the hexagon.
+
+### Tests
+
+```sh
+sudo pacman -S python-pytest     # or: sudo dnf install python3-pytest / sudo apt install python3-pytest
+python -m pytest
+```
+
+`tests/hexagon` drives the application through its driver ports, with the test
+doubles of `tests/doubles.py` on the driven ones, so it runs without a pad or a
+display. `tests/adapter` covers UHID decoding, image encoding and storage, and
+`tests/test_hexagon_isolation.py` checks that the hexagon imports nothing from
+the outside world.
 
 ## License
 
