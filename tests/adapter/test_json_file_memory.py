@@ -1,7 +1,7 @@
 import pytest
 
 from folio_board.adapter.for_remembering_the_drawing.json_file import JsonFileMemory, default_path
-from folio_board.hexagon.driven.for_remembering_the_drawing import RememberingError, Stroke
+from folio_board.hexagon.driven.for_remembering_the_drawing import Arrow, Box, RememberingError, Stroke
 
 
 def test_recalls_what_it_remembered_last(tmp_path):
@@ -11,13 +11,30 @@ def test_recalls_what_it_remembered_last(tmp_path):
     assert JsonFileMemory(path).recall() == [Stroke(3, [(10, 20, 0.1235), (11, 21, 1.0)]), Stroke(0, [])]
 
 
+def test_recalls_shapes_with_the_strokes_they_replaced(tmp_path):
+    path = str(tmp_path / 'drawing.json')
+    drawn = [Stroke(2, [(1, 2, 0.5), (3, 4, 0.5)])]
+    items = [Stroke(0, [(5, 6, 0.25)]),
+             Box(2, 0.5, (100, 200, 1100, 1700), drawn),
+             Arrow(4, 0.3, (0, 0), (500, 100), (1000, 0), drawn + drawn)]
+    JsonFileMemory(path).remember(items)
+    assert JsonFileMemory(path).recall() == items
+
+
+def test_unknown_item_is_a_remembering_error(tmp_path):
+    path = tmp_path / 'drawing.json'
+    path.write_text('{"version": 2, "items": [{"type": "cloud", "color": 0, "pressure": 1, "strokes": []}]}')
+    with pytest.raises(RememberingError, match='cloud'):
+        JsonFileMemory(str(path)).recall()
+
+
 def test_nothing_remembered_is_an_empty_drawing(tmp_path):
     assert JsonFileMemory(str(tmp_path / 'drawing.json')).recall() == []
 
 
 def test_unreadable_file_is_a_remembering_error(tmp_path):
     path = tmp_path / 'drawing.json'
-    path.write_text('{"strokes": [{"colour": 1}]}')
+    path.write_text('{"version": 2, "items": [{"type": "stroke", "colour": 1}]}')
     with pytest.raises(RememberingError):
         JsonFileMemory(str(path)).recall()
 

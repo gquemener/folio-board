@@ -9,7 +9,7 @@ def draw(app, *points, pressure=1024):
 
 
 def test_start_brings_back_the_kept_drawing(world):
-    world.memory.strokes = [Stroke(4, [(3100, 200, 0.5), (3300, 400, 0.5)])]
+    world.memory.items = [Stroke(4, [(3100, 200, 0.5), (3300, 400, 0.5)])]
     world.app.start()
     segments = world.app.page().segments
     assert [s[:4] for s in segments] == [(14600, 3100, 14600, 3100), (14600, 3100, 14400, 3300)]
@@ -35,7 +35,7 @@ def test_each_stroke_is_kept_when_the_pen_lifts(world):
     world.app.pen(True, 3200, 300, 1000)
     assert world.memory.remembered == 0  # not while drawing
     world.app.pen(True, 3200, 300, 0)
-    assert world.memory.strokes == [Stroke(0, [(3100, 200, 1000 / 2047), (3200, 300, 1000 / 2047)])]
+    assert world.memory.items == [Stroke(0, [(3100, 200, 1000 / 2047), (3200, 300, 1000 / 2047)])]
     world.app.pen(False, 0, 0, 0)
     assert world.memory.remembered == 1
 
@@ -49,13 +49,13 @@ def test_picking_a_color_keeps_nothing(world):
 def test_clear_is_kept(world):
     draw(world.app, (3100, 200))
     world.app.clear()
-    assert world.memory.strokes == []
+    assert world.memory.items == []
 
 
 def test_stopping_keeps_a_stroke_still_under_way(world):
     world.app.pen(True, 3100, 200, 1000)
     world.app.stop()
-    assert len(world.memory.strokes) == 1
+    assert len(world.memory.items) == 1
 
 
 def test_a_drawing_that_cannot_be_kept_says_why_and_stays_on_the_page(world):

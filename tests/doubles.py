@@ -56,23 +56,23 @@ class InMemoryStorage(ForStoringDrawings):
 
 
 class InMemoryMemory(ForRememberingTheDrawing):
-    """ForRememberingTheDrawing: keeps a copy of the strokes, as a file would."""
+    """ForRememberingTheDrawing: keeps a copy of the strokes and shapes, as a file would."""
 
-    def __init__(self, strokes=()):
-        self.strokes = [copy.deepcopy(s) for s in strokes]
+    def __init__(self, items=()):
+        self.items = [copy.deepcopy(i) for i in items]
         self.remembered = 0
         self.error = None
 
-    def remember(self, strokes):
+    def remember(self, items):
         if self.error:
             raise RememberingError(self.error)
-        self.strokes = copy.deepcopy(strokes)
+        self.items = copy.deepcopy(items)
         self.remembered += 1
 
     def recall(self):
         if self.error:
             raise RememberingError(self.error)
-        return copy.deepcopy(self.strokes)
+        return copy.deepcopy(self.items)
 
 
 class InMemorySettings(ForRememberingSettings):

@@ -1,7 +1,7 @@
 """FolioBoard: the application, as its driver actors (presenter and pad) see it."""
 import os
 
-from folio_board.hexagon import palette
+from folio_board.hexagon import palette, shapes
 from folio_board.hexagon.board import FALLBACK_PRESSURE_MAX, Board
 from folio_board.hexagon.driven.for_encoding_images import EncodingError, ForEncodingImages
 from folio_board.hexagon.driven.for_linking_the_pad import ForLinkingThePad, PadLinkError
@@ -53,6 +53,9 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         self.presenter: ForNotifyingThePresenter = _NoPresenter()
         self.connected = False
         self.started_at = 0
+        self.shapes = True
+        self.grouper = shapes.Grouper()
+        self.stroke_started = 0
 
     def set_presenter(self, presenter: ForNotifyingThePresenter):
         """The presenter's screen is made after the application, since it drives it too."""
@@ -65,11 +68,12 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
             settings = self.settings_memory.recall()
             self.board.set_orientation(settings.orientation)
             self.board.pressure_sensitive = settings.pressure_sensitive
+            self.shapes = settings.shapes
         except SettingsError as e:
             self.presenter.toast(f'Could not restore the settings: {e}')
         self.presenter.settings_changed()
         try:
-            self.board.strokes = self.memory.recall()
+            self.board.items = self.memory.recall()
         except RememberingError as e:
             self.presenter.toast(f'Could not restore the last drawing: {e}')
         self.presenter.page_changed()
@@ -84,6 +88,7 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
 
     def clear(self):
         self.board.clear()
+        self.grouper.reset()
         self._remember()
         self.presenter.page_changed()
 
@@ -98,6 +103,12 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
             self.board.pressure_sensitive = on
             self._remember_settings()
             self.presenter.page_changed()
+
+    def set_shapes(self, on):
+        if on != self.shapes:
+            self.shapes = on
+            self.grouper.reset()
+            self._remember_settings()
 
     def begin_crop(self, at):
         self.board.begin_crop(at)
@@ -138,7 +149,7 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         return Page(vw, vh, self.board.segments(), self.board.crop, hover, self.board.swatches())
 
     def settings(self):
-        return Settings(self.board.orientation, self.board.pressure_sensitive)
+        return Settings(self.board.orientation, self.board.pressure_sensitive, self.shapes)
 
     # ForReceivingPenInput
 
@@ -146,8 +157,10 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         drawing = self.board.current
         if self.board.pen(in_range, x, y, pressure):
             self.presenter.toast(palette.COLORS[self.board.color][0])
+        if drawing is None and self.board.current is not None:
+            self.stroke_started = self.clock.now()
         if drawing is not None and self.board.current is not drawing:
-            self._remember()  # the pen lifted: the stroke is done
+            self._stroke_done(drawing)
         self.presenter.page_changed()
 
     def pad_connected(self, pressure_max):
@@ -169,9 +182,17 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         if not self.connected and self.clock.now() - self.started_at >= RETRY_SECONDS:
             self._start_live()
 
+    def _stroke_done(self, stroke):
+        if self.shapes:
+            snapped = self.grouper.stroke_done(stroke, self.stroke_started, self.clock.now())
+            if snapped:
+                shape, strokes = snapped
+                self.board.replace(strokes, shape)
+        self._remember()
+
     def _remember(self):
         try:
-            self.memory.remember(self.board.strokes)
+            self.memory.remember(self.board.items)
         except RememberingError as e:
             self.presenter.status(f'Could not keep the drawing: {e}')
 

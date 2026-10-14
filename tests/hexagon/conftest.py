@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import pytest
 
 from folio_board.hexagon.application import FolioBoard
-from tests.doubles import FakeClock, FakePad, InMemoryMemory, InMemorySettings, InMemoryStorage, PresenterSpy, SharingSpy, StubEncoder
+from tests.doubles import (FakeClock, FakePad, InMemoryMemory, InMemorySettings, InMemoryStorage, PresenterSpy,
+                           SharingSpy, StubEncoder)
 
 # A5 pad: 21000 x 14800 units, so 14800 x 21000 when shown in portrait.
 A5_UM = (210000, 148000)

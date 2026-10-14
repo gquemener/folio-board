@@ -8,8 +8,8 @@ from folio_board.hexagon.driver.for_presenting_drawings import Settings
 def test_recalls_what_it_remembered_last(tmp_path):
     path = str(tmp_path / 'state' / 'settings.json')
     JsonFileSettings(path).remember(Settings('landscape', True))
-    JsonFileSettings(path).remember(Settings('landscape', False))
-    assert JsonFileSettings(path).recall() == Settings('landscape', False)
+    JsonFileSettings(path).remember(Settings('landscape', False, False))
+    assert JsonFileSettings(path).recall() == Settings('landscape', False, False)
 
 
 def test_nothing_remembered_gives_the_defaults(tmp_path):
@@ -19,11 +19,11 @@ def test_nothing_remembered_gives_the_defaults(tmp_path):
 def test_a_missing_setting_keeps_its_default(tmp_path):
     path = tmp_path / 'settings.json'
     path.write_text('{"pressure_sensitive": false}')
-    assert JsonFileSettings(str(path)).recall() == Settings('portrait', False)
+    assert JsonFileSettings(str(path)).recall() == Settings('portrait', False, True)
 
 
 @pytest.mark.parametrize('content', ['not json', '[]', '{"orientation": "upside-down"}',
-                                     '{"pressure_sensitive": "yes"}'])
+                                     '{"pressure_sensitive": "yes"}', '{"shapes": 1}'])
 def test_unreadable_file_is_a_settings_error(tmp_path, content):
     path = tmp_path / 'settings.json'
     path.write_text(content)

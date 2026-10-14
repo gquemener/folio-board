@@ -78,6 +78,10 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
                                         tooltip_text='Vary line width with pen pressure')
         self.pressure.connect('toggled', lambda b: board.set_pressure_sensitive(b.get_active()))
         header.pack_end(self.pressure)
+        self.shapes = Gtk.CheckButton(label='Shapes', active=True,
+                                      tooltip_text='Replace hand-drawn boxes and arrows with clean ones')
+        self.shapes.connect('toggled', lambda b: board.set_shapes(b.get_active()))
+        header.pack_end(self.shapes)
         self.status_label = Gtk.Label(label='Starting…')
         header.pack_end(self.status_label)
         self.set_titlebar(header)
@@ -104,6 +108,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         settings = self.board.settings()
         (self.landscape if settings.orientation == 'landscape' else self.portrait).set_active(True)
         self.pressure.set_active(settings.pressure_sensitive)
+        self.shapes.set_active(settings.shapes)
 
     def status(self, text):
         self.status_label.set_label(text)
@@ -132,6 +137,8 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
             (self.portrait if self.landscape.get_active() else self.landscape).set_active(True)
         elif keyval == Gdk.KEY_p:
             self.pressure.set_active(not self.pressure.get_active())
+        elif keyval == Gdk.KEY_o:
+            self.shapes.set_active(not self.shapes.get_active())
         elif keyval == Gdk.KEY_s and ctrl:
             self.save()
         return True

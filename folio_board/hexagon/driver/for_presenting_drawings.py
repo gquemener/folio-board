@@ -27,6 +27,8 @@ class Settings:
     orientation: Orientation = 'portrait'
     # Vary line width with pen pressure.
     pressure_sensitive: bool = True
+    # Replace hand-drawn boxes and arrows with clean, sketchy ones.
+    shapes: bool = True
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,10 @@ class ForPresentingDrawings:
 
     def set_pressure_sensitive(self, on: bool) -> None:
         """Vary line width with pen pressure, or draw every stroke at the same width."""
+        raise NotImplementedError
+
+    def set_shapes(self, on: bool) -> None:
+        """Replace boxes and arrows drawn from now on with clean ones, or leave them as drawn."""
         raise NotImplementedError
 
     def begin_crop(self, at: Point) -> None:

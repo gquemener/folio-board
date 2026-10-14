@@ -17,7 +17,8 @@ class JsonFileSettings(ForRememberingSettings):
         self.path = path or default_path()
 
     def remember(self, settings):
-        data = {'orientation': settings.orientation, 'pressure_sensitive': settings.pressure_sensitive}
+        data = {'orientation': settings.orientation, 'pressure_sensitive': settings.pressure_sensitive,
+                'shapes': settings.shapes}
         tmp = self.path + '.tmp'
         try:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
@@ -36,9 +37,13 @@ class JsonFileSettings(ForRememberingSettings):
         except (OSError, ValueError) as e:
             raise SettingsError(str(e)) from e
         # A setting missing from the file keeps its default.
-        default = Settings()
-        orientation = data.get('orientation', default.orientation) if isinstance(data, dict) else None
-        pressure = data.get('pressure_sensitive', default.pressure_sensitive) if isinstance(data, dict) else None
-        if orientation not in typing.get_args(Orientation) or not isinstance(pressure, bool):
+        if not isinstance(data, dict):
             raise SettingsError(f'unexpected settings in {self.path}')
-        return Settings(orientation, pressure)
+        default = Settings()
+        orientation = data.get('orientation', default.orientation)
+        pressure = data.get('pressure_sensitive', default.pressure_sensitive)
+        shapes = data.get('shapes', default.shapes)
+        if (orientation not in typing.get_args(Orientation) or not isinstance(pressure, bool)
+                or not isinstance(shapes, bool)):
+            raise SettingsError(f'unexpected settings in {self.path}')
+        return Settings(orientation, pressure, shapes)

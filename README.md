@@ -73,6 +73,7 @@ press the pad's button at any time.
 | Clear the page (asks first) | Clear                           | `c`        |
 | Portrait / landscape        | Portrait, Landscape             | `r`        |
 | Pressure on/off             | Pressure                        | `p`        |
+| Shapes on/off               | Shapes                          | `o`        |
 | Save as PNG or SVG          | Save                            | `Ctrl+S`   |
 | Copy as SVG                 | Copy                            | `Ctrl+C`   |
 | Pick area to save or copy   | drag with the mouse on the page |            |
@@ -87,8 +88,28 @@ brought back.
 With **Pressure** checked (the default), pressing harder draws a thicker line.
 Uncheck it to draw every stroke at the same width.
 
-The orientation and the **Pressure** setting are kept between sessions too,
-and clearing the drawing leaves them as they are.
+The orientation and the **Pressure** and **Shapes** settings are kept between
+sessions too, and clearing the drawing leaves them as they are.
+
+### Shapes
+
+With **Shapes** checked (the default), boxes and arrows you draw by hand are
+replaced by clean ones, with a slightly sketchy, mockup-like look. They keep
+the color you drew them in, and their line width follows the **Pressure**
+setting, like strokes do. Uncheck **Shapes** when you want to draw freely:
+what you draw from then on stays as drawn, and shapes already on the page stay.
+
+- **Boxes** can be drawn in one stroke or in up to four (a side or an L at a
+  time). They come out upright, so a box tilted more than about 15° stays as
+  drawn, and the shorter side must be at least 8 mm, so handwriting never snaps.
+- **Arrows** are a shaft followed by a head, drawn as a V or as two strokes.
+  A curved shaft gives a curved arrow; a nearly straight one gives a straight
+  arrow, turned to the nearest horizontal, vertical or diagonal when close.
+
+Strokes count as one shape when you draw them one right after another, with
+less than 1.5 s between them, in the same color. Pause a little before
+drawing next to a shape you have just finished, so the two don't get mixed.
+The shape appears as soon as its last stroke is done.
 
 ### Colors
 
@@ -186,6 +207,11 @@ doubles of `tests/doubles.py` on the driven ones, so it runs without a pad or a
 display. `tests/adapter` covers UHID decoding, image encoding, storage, and the
 kept drawing and settings, and `tests/test_hexagon_isolation.py` checks that
 the hexagon imports nothing from the outside world.
+
+`tests/fixtures/shape_samples.json` holds boxes, arrows, handwriting and
+doodles drawn on a Bamboo Folio. Shape recognition is tested, and its
+thresholds were tuned, on these strokes: when a shape you draw is missed, or
+something snaps that should not, adding it there makes a test case.
 
 ## License
 

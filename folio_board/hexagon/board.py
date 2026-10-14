@@ -1,6 +1,6 @@
-"""The page: strokes in pad units, how the page is turned, and the area framed for saving."""
-from folio_board.hexagon import palette
-from folio_board.hexagon.driven.for_remembering_the_drawing import Stroke
+"""The page: strokes and shapes in pad units, how the page is turned, and the area framed for saving."""
+from folio_board.hexagon import palette, shapes
+from folio_board.hexagon.driven.for_remembering_the_drawing import Item, Stroke
 from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Orientation, Swatch
 
 # Slate / Folio value, used until the pad reports the real one.
@@ -18,7 +18,8 @@ class Board:
     def __init__(self, pad_w, pad_h):
         self.pad_w, self.pad_h = pad_w, pad_h
         self.orientation: Orientation = 'portrait'
-        self.strokes = []
+        self.items: list[Item] = []  # strokes and shapes, in drawing order
+        self.sketches = {}  # id(shape): (shape, its sketched lines with their taper), worked out once
         self.current = None
         self.hover = None
         self.pressure_max = FALLBACK_PRESSURE_MAX
@@ -61,7 +62,7 @@ class Board:
                 self.picking = True
                 return True
             self.current = Stroke(self.color)
-            self.strokes.append(self.current)
+            self.items.append(self.current)
         self.current.points.append((x, y, min(pressure / self.pressure_max, 1.0)))
         return False
 
@@ -88,8 +89,15 @@ class Board:
             swatches.append(Swatch(rect, palette.rgb(value), name, i == self.color))
         return tuple(swatches)
 
+    def replace(self, strokes, shape):
+        """Put shape where the first of these strokes was, and drop them."""
+        at = next(i for i, item in enumerate(self.items) if item is strokes[0])
+        self.items[at:at] = [shape]
+        self.items = [item for item in self.items if not any(item is s for s in strokes)]
+
     def clear(self):
-        self.strokes.clear()
+        self.items.clear()
+        self.sketches.clear()
         self.current = None
 
     def set_orientation(self, orientation: Orientation):
@@ -97,27 +105,40 @@ class Board:
             self.orientation = orientation
             self.crop = None  # it framed the page as it was turned before
 
+    def width(self, pressure):
+        """Line width in pad units for a pressure from 0 to 1."""
+        units_per_mm = 1000 / UNIT_UM
+        if not self.pressure_sensitive:
+            return PEN_FIXED_WIDTH_MM * units_per_mm
+        return (PEN_MIN_WIDTH_MM + (PEN_MAX_WIDTH_MM - PEN_MIN_WIDTH_MM) * pressure) * units_per_mm
+
     def segments(self):
         """Line segments (x0, y0, x1, y1, width, color) in view units; a stroke's first point is a dot."""
-        units_per_mm = 1000 / UNIT_UM
-        min_w, max_w = PEN_MIN_WIDTH_MM * units_per_mm, PEN_MAX_WIDTH_MM * units_per_mm
         segments = []
-        for stroke in self.strokes:
-            color = palette.rgb(palette.COLORS[stroke.color][1])
+        for item in self.items:
+            color = palette.rgb(palette.COLORS[item.color][1])
+            if not isinstance(item, Stroke):
+                width = self.width(item.pressure)
+                for line, taper in self.sketch(item):
+                    view = [self.to_view(x, y) for x, y in line]
+                    segments += [(*a, *b, width * t, color) for a, b, t in zip(view, view[1:], taper)]
+                continue
             prev = None
-            for x, y, p in stroke.points:
+            for x, y, p in item.points:
                 vx, vy = self.to_view(x, y)
                 if prev is None:
                     prev = (vx, vy, p)
                 # Each segment takes the mean pressure of its ends, so width changes smoothly.
                 px, py, pp = prev
-                if self.pressure_sensitive:
-                    width = min_w + (max_w - min_w) * (p + pp) / 2
-                else:
-                    width = PEN_FIXED_WIDTH_MM * units_per_mm
-                segments.append((px, py, vx, vy, width, color))
+                segments.append((px, py, vx, vy, self.width((p + pp) / 2), color))
                 prev = (vx, vy, p)
         return tuple(segments)
+
+    def sketch(self, shape):
+        cached = self.sketches.get(id(shape))
+        if cached is None or cached[0] is not shape:
+            cached = self.sketches[id(shape)] = (shape, [(line, shapes.taper(line)) for line in shapes.sketch(shape)])
+        return cached[1]
 
     def clamp(self, x, y):
         vw, vh = self.view_size
