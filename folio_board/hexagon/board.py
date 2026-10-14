@@ -1,7 +1,7 @@
 """The page: strokes in pad units, how the page is turned, and the area framed for saving."""
 from folio_board.hexagon import palette
 from folio_board.hexagon.driven.for_remembering_the_drawing import Stroke
-from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Swatch
+from folio_board.hexagon.driver.for_presenting_drawings import UNIT_UM, Orientation, Swatch
 
 # Slate / Folio value, used until the pad reports the real one.
 FALLBACK_PRESSURE_MAX = 2047
@@ -10,14 +10,13 @@ PEN_MIN_WIDTH_MM = 0.2
 PEN_MAX_WIDTH_MM = 2.4
 # Stroke width on paper when pressure sensitivity is off.
 PEN_FIXED_WIDTH_MM = 0.8
-ORIENTATIONS = ['portrait', 'landscape', 'reverse-portrait', 'reverse-landscape']
 STRIP_UNITS = palette.STRIP_MM * 1000 // UNIT_UM
 
 
 class Board:
     def __init__(self, pad_w, pad_h):
         self.pad_w, self.pad_h = pad_w, pad_h
-        self.orientation = 'portrait'
+        self.orientation: Orientation = 'portrait'
         self.strokes = []
         self.current = None
         self.hover = None
@@ -33,7 +32,7 @@ class Board:
 
     @property
     def view_size(self):
-        if self.orientation in ('portrait', 'reverse-portrait'):
+        if self.orientation == 'portrait':
             return self.pad_h, self.pad_w
         return self.pad_w, self.pad_h
 
@@ -42,11 +41,7 @@ class Board:
         w, h = self.view_size
         if self.orientation == 'portrait':
             return w - y, x
-        if self.orientation == 'reverse-portrait':
-            return y, h - x
-        if self.orientation == 'reverse-landscape':
-            return w - x, h - y
-        return x, y
+        return w - x, h - y  # landscape: the pad's top edge, and the palette strip, on the right
 
     def pen(self, in_range, x, y, pressure):
         """Follow the pen; True when it just picked a color on the palette strip."""
@@ -95,10 +90,10 @@ class Board:
         self.strokes.clear()
         self.current = None
 
-    def rotate(self):
-        i = ORIENTATIONS.index(self.orientation)
-        self.orientation = ORIENTATIONS[(i + 1) % len(ORIENTATIONS)]
-        self.crop = None  # it framed the page as it was turned before
+    def set_orientation(self, orientation: Orientation):
+        if orientation != self.orientation:
+            self.orientation = orientation
+            self.crop = None  # it framed the page as it was turned before
 
     def segments(self):
         """Line segments (x0, y0, x1, y1, width, color) in view units; a stroke's first point is a dot."""

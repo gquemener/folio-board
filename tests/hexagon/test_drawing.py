@@ -88,17 +88,14 @@ def test_segments_average_the_pressure_of_their_ends(world):
     assert world.app.page().segments[1][4] == pytest.approx(20 + 220 * (1 / 2000 + 1) / 2)
 
 
-@pytest.mark.parametrize('turns, size, point', [
-    (0, (14800, 21000), (14600, 3100)),   # portrait
-    (1, (21000, 14800), (3100, 200)),     # landscape
-    (2, (14800, 21000), (200, 17900)),    # reverse portrait
-    (3, (21000, 14800), (17900, 14600)),  # reverse landscape
-    (4, (14800, 21000), (14600, 3100)),   # full turn
+@pytest.mark.parametrize('orientations, size, point', [
+    (['landscape'], (21000, 14800), (17900, 14600)),
+    (['landscape', 'portrait'], (14800, 21000), (14600, 3100)),
 ])
-def test_rotating_turns_the_page(world, turns, size, point):
+def test_orientation_turns_the_page(world, orientations, size, point):
     world.app.pen(True, 3100, 200, 1000)
-    for _ in range(turns):
-        world.app.rotate()
+    for orientation in orientations:
+        world.app.set_orientation(orientation)
     page = world.app.page()
     assert (page.width, page.height) == size
     assert page.segments[0][:2] == point

@@ -58,7 +58,9 @@ def test_new_drag_replaces_the_crop(world):
     assert world.app.page().crop == (2000, 2000, 3000, 3000)
 
 
-def test_rotating_drops_the_crop(world):
+def test_changing_orientation_drops_the_crop(world):
     frame(world.app, (1000, 1000), (5000, 5000))
-    world.app.rotate()
+    world.app.set_orientation('portrait')
+    assert world.app.page().crop == (1000, 1000, 5000, 5000)
+    world.app.set_orientation('landscape')
     assert world.app.page().crop is None

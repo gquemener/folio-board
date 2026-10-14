@@ -68,16 +68,16 @@ folio-board DF:87:C0:AB:82:6D    # or pick a pad by Bluetooth address
 While waiting, the window retries the connection every 30 seconds, so you can
 press the pad's button at any time.
 
-| Action             | Button    | Key        |
-| ------------------ | --------- | ---------- |
-| Clear the page (asks first) | Clear | `c`      |
-| Rotate the page    | Rotate    | `r`        |
-| Pressure on/off    | Pressure  | `p`        |
-| Save as PNG or SVG | Save      | `Ctrl+S`   |
-| Copy as SVG        | Copy      | `Ctrl+C`   |
-| Pick area to save or copy | drag with the mouse on the page | |
-| Force a reconnect  | Reconnect |            |
-| Quit               |           | `q`, `Esc` |
+| Action                      | Button                          | Key        |
+| --------------------------- | ------------------------------- | ---------- |
+| Clear the page (asks first) | Clear                           | `c`        |
+| Portrait / landscape        | Portrait, Landscape             | `r`        |
+| Pressure on/off             | Pressure                        | `p`        |
+| Save as PNG or SVG          | Save                            | `Ctrl+S`   |
+| Copy as SVG                 | Copy                            | `Ctrl+C`   |
+| Pick area to save or copy   | drag with the mouse on the page |            |
+| Force a reconnect           | Reconnect                       |            |
+| Quit                        |                                 | `q`, `Esc` |
 
 The drawing is kept between sessions: close the window, and the next
 `folio-board` shows the page as you left it. It stays until you clear it.
@@ -97,21 +97,21 @@ the current color framed, and briefly names the color you picked.
 
 Mark the boxes on the paper (or keep a printed strip at the top edge) so you
 can find them without looking at the screen. Each box is 1/16 of the pad's
-width, 13.5 mm on an A4 Folio. The strip stays on the pad's top edge when you
-rotate the page, and it is left out of saved and copied images.
+width, 13.5 mm on an A4 Folio. The strip stays on the pad's top edge, which
+is on the right in landscape, and it is left out of saved and copied images.
 
 The red dot shows where the pen hovers, so viewers can follow it before it
 touches the paper.
 
 Save opens a file dialog in your Pictures folder. The format follows the file
 extension: `.svg` gives a vector file at the paper's real size, anything else a
-200 DPI PNG. The saved page uses the board's current rotation and leaves out the
-hover dot.
+200 DPI PNG. The saved page uses the board's current orientation and leaves out
+the hover dot.
 
 To save only part of the page, drag a rectangle over it with the mouse first:
 the rest is shaded and Save keeps only the framed area. Drag again to change it,
-or click outside the framed area to go back to using the whole page. Rotating the page
-drops the crop.
+or click outside the framed area to go back to using the whole page. Switching
+between portrait and landscape drops the crop.
 
 Copy puts the same page, or the framed area, on the clipboard as SVG, ready to
 paste into Figma, Inkscape or a slide. It is offered as `image/svg+xml`, as

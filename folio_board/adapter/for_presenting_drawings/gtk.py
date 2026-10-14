@@ -53,13 +53,21 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         self.set_child(overlay)
 
         header = Gtk.HeaderBar()
-        for label, handler in (('Clear', self.confirm_clear), ('Rotate', board.rotate),
-                               ('Reconnect', board.reconnect)):
-            button = Gtk.Button(label=label)
-            button.connect('clicked', lambda _b, h=handler: h())
-            header.pack_start(button)
-        self.reconnect_button = button
-        button.set_sensitive(False)
+        clear = Gtk.Button(label='Clear')
+        clear.connect('clicked', lambda _b: self.confirm_clear())
+        header.pack_start(clear)
+        # The page starts in portrait, in the application too.
+        self.portrait = Gtk.ToggleButton(label='Portrait', active=True)
+        self.landscape = Gtk.ToggleButton(label='Landscape', group=self.portrait)
+        self.landscape.connect('toggled', lambda b: board.set_orientation(
+            'landscape' if b.get_active() else 'portrait'))
+        orientation = Gtk.Box(css_classes=['linked'])
+        orientation.append(self.portrait)
+        orientation.append(self.landscape)
+        header.pack_start(orientation)
+        self.reconnect_button = Gtk.Button(label='Reconnect', sensitive=False)
+        self.reconnect_button.connect('clicked', lambda _b: board.reconnect())
+        header.pack_start(self.reconnect_button)
         save = Gtk.Button(label='Save')
         save.connect('clicked', lambda _b: self.save())
         header.pack_end(save)
@@ -115,7 +123,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         elif keyval == Gdk.KEY_c:
             self.confirm_clear()
         elif keyval == Gdk.KEY_r:
-            self.board.rotate()
+            (self.portrait if self.landscape.get_active() else self.landscape).set_active(True)
         elif keyval == Gdk.KEY_p:
             self.pressure.set_active(not self.pressure.get_active())
         elif keyval == Gdk.KEY_s and ctrl:

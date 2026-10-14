@@ -76,8 +76,8 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         self._remember()
         self.presenter.page_changed()
 
-    def rotate(self):
-        self.board.rotate()
+    def set_orientation(self, orientation):
+        self.board.set_orientation(orientation)
         self.presenter.page_changed()
 
     def set_pressure_sensitive(self, on):

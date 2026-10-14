@@ -97,17 +97,12 @@ def test_swatches_lie_along_the_top_in_portrait(world):
     assert swatches[15].rect == (15 * BOX, 0, 14800, 1500)
 
 
-@pytest.mark.parametrize('turns, first, last', [
-    # A quarter turn: black, top left in portrait, goes to the bottom of the left edge.
-    (1, (0, 14800 - BOX, 1500, 14800), (0, 0, 1500, BOX)),
-    (2, (14800 - BOX, 21000 - 1500, 14800, 21000), (0, 21000 - 1500, BOX, 21000)),  # upside down: bottom
-    (3, (21000 - 1500, 0, 21000, BOX), (21000 - 1500, 14800 - BOX, 21000, 14800)),  # right edge
-])
-def test_the_strip_stays_on_the_pads_top_edge_when_rotating(world, turns, first, last):
-    for _ in range(turns):
-        world.app.rotate()
+def test_the_strip_stays_on_the_pads_top_edge_in_landscape(world):
+    world.app.set_orientation('landscape')
     swatches = world.app.page().palette
-    assert (swatches[0].rect, swatches[15].rect) == (first, last)
+    # Black, top left in portrait, goes to the top of the right edge.
+    assert (swatches[0].rect, swatches[15].rect) == ((21000 - 1500, 0, 21000, BOX),
+                                                     (21000 - 1500, 14800 - BOX, 21000, 14800))
 
 
 def test_picking_survives_clearing(world):

@@ -1,6 +1,6 @@
 """Driver port for the presenter: the person who shows the drawing, then saves or copies it."""
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 
 # Page coordinates are pad units: 10 µm on paper.
 UNIT_UM = 10
@@ -9,6 +9,7 @@ UNIT_MM = UNIT_UM / 1000
 Point = tuple[float, float]
 Rect = tuple[float, float, float, float]  # x0, y0, x1, y1
 Color = tuple[float, float, float]  # red, green, blue, from 0 to 1
+Orientation = Literal['portrait', 'landscape']
 
 
 @dataclass(frozen=True)
@@ -52,8 +53,8 @@ class ForPresentingDrawings:
         """Remove every stroke, from the drawing kept between sessions too."""
         raise NotImplementedError
 
-    def rotate(self) -> None:
-        """Turn the page a quarter turn; this drops the crop."""
+    def set_orientation(self, orientation: Orientation) -> None:
+        """Show the page in portrait (the default) or landscape; a change drops the crop."""
         raise NotImplementedError
 
     def set_pressure_sensitive(self, on: bool) -> None:
