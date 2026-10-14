@@ -51,4 +51,4 @@ def test_settings_that_cannot_be_kept_still_apply_and_say_why(world):
     world.settings_memory.error = 'disk full'
     world.app.set_orientation('landscape')
     assert world.app.view_size() == (21000, 14800)
-    assert world.presenter.statuses == ['Could not keep the settings: disk full']
+    assert world.presenter.toasts == ['Could not keep the settings: disk full']

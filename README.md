@@ -62,11 +62,13 @@ folio-board DF:87:C0:AB:82:6D    # or pick a pad by Bluetooth address
 ```
 
 1. Run `folio-board`. It starts the Tuhi daemon if it isn't already running.
-2. Press the pad's button. The header shows **Connected, draw away**.
+   The header is light red while the pad is not connected.
+2. Press the pad's button. The header turns light green.
 3. Draw on the pad. Share the **Folio board** window in your call.
 
 While waiting, the window retries the connection every 30 seconds, so you can
-press the pad's button at any time.
+press the pad's button at any time. Messages, such as a save that failed or a
+lost connection, briefly appear at the bottom of the page.
 
 | Action                      | Button                          | Key        |
 | --------------------------- | ------------------------------- | ---------- |

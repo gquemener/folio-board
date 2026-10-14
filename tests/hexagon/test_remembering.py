@@ -55,5 +55,5 @@ def test_stopping_keeps_a_stroke_still_under_way(world):
 def test_a_drawing_that_cannot_be_kept_says_why_and_stays_on_the_page(world):
     world.memory.error = 'disk full'
     draw(world.app, (3100, 200))
-    assert world.presenter.statuses == ['Could not keep the drawing: disk full']
+    assert world.presenter.toasts == ['Could not keep the drawing: disk full']
     assert len(world.app.page().segments) == 1

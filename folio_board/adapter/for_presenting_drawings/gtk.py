@@ -2,7 +2,7 @@
 
 BoardWindow plays both sides of the presenter actor: it drives ForPresentingDrawings
 with buttons, keys and mouse drags, and implements the driven port
-ForNotifyingThePresenter to show the page, the status line and short messages.
+ForNotifyingThePresenter to show the page, whether the pad is connected, and short messages.
 """
 import os
 import time
@@ -11,7 +11,7 @@ import gi
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
-from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 import cairo  # noqa: E402
 
@@ -22,13 +22,18 @@ from folio_board.lib.cairo_page import draw_paper, draw_strokes  # noqa: E402
 # A crop drag shorter than this, in screen pixels, is a click: outside the crop it drops it.
 MIN_CROP_PIXELS = 8
 TOAST_MS = 1500
+# Longer messages, like errors, stay longer: this long per character.
+TOAST_MS_PER_CHAR = 60
 # The top row of a French AZERTY keyboard, without Shift, picks the palette's colors in order:
 # & é " ' ( - è _ ç. The next key, à, picks the eraser.
 COLOR_KEY_NAMES = ('&', 'é', '"', "'", '(', '-', 'è', '_', 'ç')
 COLOR_KEYS = {Gdk.unicode_to_keyval(ord(name)): color for color, name in enumerate(COLOR_KEY_NAMES)}
 CSS = ('.toast { background: rgba(0, 0, 0, 0.75); color: white; border-radius: 99px; padding: 8px 20px; }'
        '.tool { padding: 2px 5px; min-width: 0; }'
-       '.tool:checked { box-shadow: inset 0 0 0 2px #3584e4; background: rgba(53, 132, 228, 0.15); }')
+       '.tool:checked { box-shadow: inset 0 0 0 2px #3584e4; background: rgba(53, 132, 228, 0.15); }'
+       # The header's background tells whether the pad is connected, in light colors easy on the eyes.
+       'headerbar.connected, headerbar.connected:backdrop { background: #d4f2cc; }'
+       'headerbar.disconnected, headerbar.disconnected:backdrop { background: #f8d3ce; }')
 
 
 def pictures_dir():
@@ -58,7 +63,7 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         overlay.add_overlay(self.toast_revealer)
         self.set_child(overlay)
 
-        header = Gtk.HeaderBar()
+        self.header = header = Gtk.HeaderBar()
         clear = Gtk.Button(label='Clear')
         clear.connect('clicked', lambda _b: self.confirm_clear())
         header.pack_start(clear)
@@ -88,11 +93,9 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
                                       tooltip_text='Replace hand-drawn boxes, circles and arrows with clean ones')
         self.shapes.connect('toggled', lambda b: board.set_shapes(b.get_active()))
         header.pack_end(self.shapes)
-        # Shortened with an ellipsis when the window is narrow; its tooltip shows it whole.
-        self.status_label = Gtk.Label(label='Starting…', ellipsize=Pango.EllipsizeMode.END, width_chars=10)
-        header.pack_end(self.status_label)
         header.set_title_widget(self.make_palette())
         self.show_pen_color()
+        self.connection_changed(False)
         self.set_titlebar(header)
 
         drag = Gtk.GestureDrag(button=Gdk.BUTTON_PRIMARY)
@@ -119,19 +122,21 @@ class BoardWindow(Gtk.ApplicationWindow, ForNotifyingThePresenter):
         self.pressure.set_active(settings.pressure_sensitive)
         self.shapes.set_active(settings.shapes)
 
-    def status(self, text):
-        self.status_label.set_label(text)
-        self.status_label.set_tooltip_text(text)
-
     def toast(self, text):
         self.toast_label.set_label(text)
         self.toast_revealer.set_reveal_child(True)
         if self.toast_timeout:
             GLib.source_remove(self.toast_timeout)
-        self.toast_timeout = GLib.timeout_add(TOAST_MS, self.hide_toast)
+        self.toast_timeout = GLib.timeout_add(max(TOAST_MS, TOAST_MS_PER_CHAR * len(text)), self.hide_toast)
 
-    def reconnect_available(self, available):
-        self.reconnect_button.set_sensitive(available)
+    def connection_changed(self, connected):
+        self.header.remove_css_class('disconnected' if connected else 'connected')
+        self.header.add_css_class('connected' if connected else 'disconnected')
+        self.header.set_tooltip_text('Pad connected, draw away' if connected
+                                     else 'Waiting for the pad: press its button')
+        # Restarting while a connection attempt is pending makes the pad link fail it,
+        # so reconnecting is only offered once a connection has been made.
+        self.reconnect_button.set_sensitive(connected)
 
     # Driving ForPresentingDrawings
 

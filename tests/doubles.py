@@ -109,11 +109,10 @@ class PresenterSpy(ForNotifyingThePresenter):
     """ForNotifyingThePresenter."""
 
     def __init__(self):
-        self.statuses = []
         self.toasts = []
         self.redraws = 0
         self.settings_shown = 0
-        self.reconnect = None
+        self.connected = None
 
     def page_changed(self):
         self.redraws += 1
@@ -121,14 +120,11 @@ class PresenterSpy(ForNotifyingThePresenter):
     def settings_changed(self):
         self.settings_shown += 1
 
-    def status(self, text):
-        self.statuses.append(text)
-
     def toast(self, text):
         self.toasts.append(text)
 
-    def reconnect_available(self, available):
-        self.reconnect = available
+    def connection_changed(self, connected):
+        self.connected = connected
 
 
 class FakeClock(ForTellingTime):

@@ -10,14 +10,10 @@ class ForNotifyingThePresenter:
         """The settings were brought back from the last session: show them on the controls."""
         raise NotImplementedError
 
-    def status(self, text: str) -> None:
-        """Show a lasting line about the pad link or the last save."""
-        raise NotImplementedError
-
     def toast(self, text: str) -> None:
-        """Show a short message that goes away by itself."""
+        """Show a short message that goes away by itself, e.g. after saving or when something failed."""
         raise NotImplementedError
 
-    def reconnect_available(self, available: bool) -> None:
-        """Whether reconnecting makes sense now."""
+    def connection_changed(self, connected: bool) -> None:
+        """The pad is connected, or not: show it. Reconnecting only makes sense while it is."""
         raise NotImplementedError

@@ -30,13 +30,10 @@ class _NoPresenter(ForNotifyingThePresenter):
     def settings_changed(self):
         pass
 
-    def status(self, text):
-        pass
-
     def toast(self, text):
         pass
 
-    def reconnect_available(self, available):
+    def connection_changed(self, connected):
         pass
 
 
@@ -144,16 +141,16 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         try:
             self.storage.store(path, self.encoder.encode(self.page(), fmt))
         except (EncodingError, StorageError) as e:
-            self.presenter.status(f'Save failed: {e}')
+            self.presenter.toast(f'Save failed: {e}')
             return
-        self.presenter.status(f'Saved {os.path.basename(path)}')
+        self.presenter.toast(f'Saved {os.path.basename(path)}')
 
     def copy(self):
         page = self.page()
         try:
             svg, png = self.encoder.encode(page, 'svg'), self.encoder.encode(page, 'png')
         except EncodingError as e:
-            self.presenter.status(f'Copy failed: {e}')
+            self.presenter.toast(f'Copy failed: {e}')
             return
         self.sharing.share(svg, png)
         self.presenter.toast('Copied')
@@ -188,12 +185,11 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
     def pad_connected(self, pressure_max):
         self.board.pressure_max = pressure_max or FALLBACK_PRESSURE_MAX
         self._set_connected(True)
-        self.presenter.status('Connected, draw away')
 
     def pad_lost(self, code):
         if code != 0:
             self._set_connected(False)
-            self.presenter.status(f'Live mode stopped ({code}), retrying…')
+            self.presenter.toast(f'Pad link lost ({code}), retrying…')
 
     def pad_resized(self, width_um, height_um):
         if width_um and height_um:
@@ -216,13 +212,13 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         try:
             self.memory.remember(self.board.items)
         except RememberingError as e:
-            self.presenter.status(f'Could not keep the drawing: {e}')
+            self.presenter.toast(f'Could not keep the drawing: {e}')
 
     def _remember_settings(self):
         try:
             self.settings_memory.remember(self.settings())
         except SettingsError as e:
-            self.presenter.status(f'Could not keep the settings: {e}')
+            self.presenter.toast(f'Could not keep the settings: {e}')
 
     def _start_live(self):
         self.pad.stop_live()
@@ -231,12 +227,8 @@ class FolioBoard(ForPresentingDrawings, ForReceivingPenInput):
         try:
             self.pad.start_live()
         except PadLinkError as e:
-            self.presenter.status(f'StartLive failed ({e.code})')
-            return
-        self.presenter.status('Waiting for the Folio… press its button')
+            self.presenter.toast(f'Could not reach the pad ({e.code})')
 
     def _set_connected(self, connected):
         self.connected = connected
-        # Restarting while a connection attempt is pending makes the pad link fail it,
-        # so reconnecting is only offered once a connection has been made.
-        self.presenter.reconnect_available(connected)
+        self.presenter.connection_changed(connected)
